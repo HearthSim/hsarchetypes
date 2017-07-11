@@ -35,7 +35,7 @@ def classify_deck(deck, archetype_ids, signature_weights, distance_cutoff):
 		if archetype_id in signature_weights:
 			for dbf_id, weight in signature_weights[archetype_id].items():
 				if dbf_id in deck:
-					distance += (deck[dbf_id] * weight)
+					distance += weight * deck.count(dbf_id)
 
 		if distance and distance >= distance_cutoff:
 			distances.append((archetype_id, distance))
