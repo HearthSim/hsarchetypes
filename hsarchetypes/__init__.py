@@ -17,11 +17,11 @@ def get_signature_components(matching_decks, observation_counts, thresholds):
 		return ret
 
 	for (card_id, dbf_id), observation_count in card_prevalence_counts.items():
-		prevalence = float(observation_count) / deck_occurrences
+		prevalence = float(observation_count) / float(deck_occurrences)
 
 		for threshold in sorted(thresholds.keys(), reverse=True):
 			if prevalence >= threshold:
-				weight = thresholds[threshold]
+				weight = float(thresholds[threshold]) * prevalence
 				ret.append(({"card_id": card_id, "dbf_id": dbf_id}, weight))
 				break
 
@@ -35,7 +35,7 @@ def classify_deck(deck, archetype_ids, signature_weights, distance_cutoff):
 		if archetype_id in signature_weights:
 			for dbf_id, weight in signature_weights[archetype_id].items():
 				if dbf_id in deck:
-					distance += weight * deck.count(dbf_id)
+					distance += weight * float(deck.count(dbf_id))
 
 		if distance and distance >= distance_cutoff:
 			distances.append((archetype_id, distance))
