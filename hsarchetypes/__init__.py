@@ -26,3 +26,20 @@ def get_signature_components(matching_decks, observation_counts, thresholds):
 				break
 
 	return ret
+
+
+def classify_deck(deck, archetype_ids, signature_weights, distance_cutoff):
+	distances = []
+	for archetype_id in archetype_ids:
+		distance = 0
+		if archetype_id in signature_weights:
+			for dbf_id, weight in signature_weights[archetype_id].items():
+				if dbf_id in deck:
+					distance += (deck[dbf_id] * weight)
+
+		if distance and distance >= distance_cutoff:
+			distances.append((archetype_id, distance))
+
+	if distances:
+		distances = sorted(distances, key=lambda t: t[1], reverse=True)
+		return distances[0][0]
