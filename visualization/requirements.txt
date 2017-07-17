@@ -1,0 +1,4 @@
+hearthstone
+requests
+scipy
+sklearn
