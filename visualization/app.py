@@ -1,14 +1,22 @@
+import functools
 import json
 import requests
+from flask import Flask, render_template
 from hsarchetypes.clustering import get_decklist_as_vector, scatter_vectors
 
 
+app = Flask(__name__)
+
+
+@functools.lru_cache()
 def get_archetypes_data():
-	with open("archetypes.json", "rb") as f:
+	# print("Parsing archetypes.json")
+	with open("archetypes.json", "r") as f:
 		r = json.load(f)["results"]
 	return {k["id"]: k for k in r}
 
 
+@functools.lru_cache()
 def query_redshift_data(game_type, rank_range="ALL", time_range="LAST_30_DAYS"):
 	endpoint = "https://hsreplay.net/analytics/query/list_decks_by_win_rate/"
 	args = {
@@ -16,11 +24,13 @@ def query_redshift_data(game_type, rank_range="ALL", time_range="LAST_30_DAYS"):
 		"RankRange": rank_range,
 		"TimeRange": time_range,
 	}
+	# print(f"Querying {endpoint} with {args}")
 	r = requests.get(endpoint, args)
 
 	return r.json()["series"]["data"]
 
 
+@functools.lru_cache()
 def get_decks_data(game_type):
 	ret = {}
 
@@ -36,6 +46,7 @@ def get_decks_data(game_type):
 		def get_popularity_index(games):
 			return (games - min_games) / (max_games - min_games)
 
+		# print(f"Cleaning data for {player_class}")
 		for deckdata in decks_for_class:
 			deck_list = json.loads(deckdata["deck_list"])
 			vector, modifiers = get_decklist_as_vector(deck_list)
@@ -70,11 +81,12 @@ def decompose_data(data):
 	xy = scatter_vectors([dd["deck_vector"] for dd in data])
 	for (x, y), metadata in zip(xy, data):
 		# delete the vector so that the resulting data isn't too large
-		del metadata["deck_vector"]
+		md = metadata.copy()
+		del md["deck_vector"]
 		ret.append({
 			"x": x,
 			"y": y,
-			"metadata": metadata,
+			"metadata": md,
 		})
 
 	return ret
@@ -113,35 +125,39 @@ def save_to_image(data, filename):
 	patches = [mpatches.Patch(label=k, color=v) for k, v in legend.items()]
 	plt.legend(handles=patches)
 	figure = plt.gcf()
-	print(f"Writing to {filename}")
+	# print(f"Writing to {filename}")
 	figure.savefig(filename)
 
 	return figure
 
 
-def main():
+@app.route("/data.json")
+def plot_data():
 	game_type = "RANKED_STANDARD"
 	decks_data = get_decks_data(game_type)
 
 	figures = []
 	for player_class, data in decks_data.items():
-		print(f"Plotting for {player_class}")
-		# data = decks_data[player_class]
+		# print(f"Plotting for {player_class}")
 		class_data = decompose_data(data)
-		figure_id = f"{player_class.title()}-{game_type.lower()}"
+		# figure_id = "{player_class.title()}-{game_type.lower()}".format()
 		figures.append({
-			"figure_id": figure_id,
+			# "figure_id": figure_id,
 			"game_type": game_type,
 			"player_class": player_class,
 			"data": class_data,
 		})
-		print("Finished plotting", figure_id)
+		# print("Finished plotting", figure_id)
 
 		# save_to_image(class_data, f"{figure_id}.png")
 
-	with open("data.json", "w") as f:
-		json.dump(figures, f)
+	return json.dumps(figures)
+
+
+@app.route("/")
+def index():
+	return render_template("index.html")
 
 
 if __name__ == "__main__":
-	main()
+	app.run()
