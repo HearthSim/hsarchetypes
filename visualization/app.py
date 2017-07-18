@@ -1,7 +1,7 @@
 import functools
 import json
 import requests
-from flask import Flask, render_template
+from flask import Flask, redirect, render_template
 from hsarchetypes.clustering import get_decklist_as_vector, scatter_vectors
 
 
@@ -157,6 +157,15 @@ def plot_data():
 @app.route("/")
 def index():
 	return render_template("index.html")
+
+
+@app.route("/clear/")
+def clear_cache():
+	get_archetypes_data.cache_clear()
+	query_redshift_data.cache_clear()
+	get_decks_data.cache_clear()
+
+	return redirect("/")
 
 
 if __name__ == "__main__":
