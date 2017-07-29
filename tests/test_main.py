@@ -1,5 +1,11 @@
+import json
+import os
 import pytest
-from hsarchetypes import get_signature_components, _calc_cross_cluster_modifier
+from hearthstone.enums import CardClass
+from hsarchetypes import (
+	calculate_signature_weights, classify_deck, _calc_cross_cluster_modifier
+)
+from tests.conftest import FIXTURE_SUITE
 
 
 def test_calc_cross_cluster_modifier():
@@ -19,86 +25,55 @@ def test_calc_cross_cluster_modifier():
 	assert _calc_cross_cluster_modifier(3, 3) == 0
 
 
+def test_signature_components(dbf_db):
+	for snapshot in os.listdir(FIXTURE_SUITE):
+		snapshot_path = os.path.join(FIXTURE_SUITE, snapshot)
 
-def test_calculate_prevalences_for_one_archetype():
-	# deck_digest -> { card_id, dbf_id, count }
-	matching_decks = {}
+		archetype_map_path = os.path.join(snapshot_path, "archetype_map.json")
+		if os.path.exists(archetype_map_path):
+			archetype_map = json.loads(open(archetype_map_path).read())
+		else:
+			archetype_map = {}
 
-	# deck_digest -> total_games
-	observation_counts = {}
+		for game_format in ("FT_STANDARD", "FT_WILD"):
+			format_path = os.path.join(snapshot_path, game_format)
+			for player_class in CardClass:
+				if CardClass.DRUID <= player_class <= CardClass.WARRIOR:
+					training_file = "%s_training_decks.json" % player_class.name
+					training_path = os.path.join(format_path, training_file)
+					training_data = json.loads(open(training_path).read())
 
-	thresholds = {
-		.8: 1,
-		.3: 0.5,
-	}
+					new_weights = calculate_signature_weights(training_data)
 
-	# archetype_id -> {dbf_id -> weight }
-	other_sigs = {
+					validation_file = "%s_validation_decks.json" % player_class.name
+					validation_path = os.path.join(format_path, validation_file)
+					validation_data = json.loads(open(validation_path).read())
 
-	}
+					for expected_id, validation_decks in validation_data.items():
+						for digest, validation_deck in validation_decks.items():
+							deck = validation_deck["cards"]
+							assigned_id = classify_deck(
+								deck,
+								new_weights.keys(),
+								new_weights
+							)
+							template = "Assigned Archetype %s (%s). Expected: %s (%s)"
+							template += "\nDeck %s %s"
+							msg = template % (
+								assigned_id,
+								archetype_map.get(assigned_id, ""),
+								expected_id,
+								archetype_map.get(expected_id, ""),
+								digest,
+								to_pretty_deck(dbf_db, deck)
+							)
 
-	components = get_signature_components(matching_decks, observation_counts, thresholds, other_sigs)
-
-	# Assert the final weight is the prevelance * threshold
-
-
-def test_calculate_prevalences_for_two_distinct_archetypes():
-	# deck_digest -> { card_id, dbf_id, count }
-	matching_decks = {}
-
-	# deck_digest -> total_games
-	observation_counts = {}
-
-	thresholds = {
-		.8: 1,
-		.3: 0.5,
-	}
-
-	# archetype_id -> {dbf_id -> weight }
-	other_sigs = {
-
-	}
-
-	components = get_signature_components(matching_decks, observation_counts, thresholds, other_sigs)
-
-
-	# Assert the final weight is the prevelance * threshold
+							assert assigned_id == expected_id, msg
 
 
-def test_calculate_prevalences_for_two_overlapping_archetypes():
-	# deck_digest -> { card_id, dbf_id, count }
-	matching_decks = {}
-
-	# deck_digest -> total_games
-	observation_counts = {}
-
-	thresholds = {
-		.8: 1,
-		.3: 0.5,
-	}
-
-	# archetype_id -> {dbf_id -> weight }
-	other_sigs = {
-
-	}
-
-	components = get_signature_components(matching_decks, observation_counts, thresholds, other_sigs)
-
-def test_calculate_prevalences_for_three_archetypes():
-	# deck_digest -> { card_id, dbf_id, count }
-	matching_decks = {}
-
-	# deck_digest -> total_games
-	observation_counts = {}
-
-	thresholds = {
-		.8: 1,
-		.3: 0.5,
-	}
-
-	# archetype_id -> {dbf_id -> weight }
-	other_sigs = {
-
-	}
-
-	components = get_signature_components(matching_decks, observation_counts, thresholds, other_sigs)
+def to_pretty_deck(dbf_db, deck):
+	result = []
+	for dbf_id, count in deck.items():
+		for i in range(count):
+			result.append(dbf_db[int(dbf_id)].name)
+	return result

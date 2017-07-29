@@ -1,39 +1,90 @@
-def get_signature_components(matching_decks, observation_counts, thresholds, other_sigs):
+from copy import copy
+
+
+ARCHETYPE_CORE_CARD_THRESHOLD=.8
+ARCHETYPE_CORE_CARD_WEIGHT=1
+ARCHETYPE_TECH_CARD_THRESHOLD=.3
+ARCHETYPE_TECH_CARD_WEIGHT=.5
+
+
+default_thresholds = {
+	ARCHETYPE_CORE_CARD_THRESHOLD: ARCHETYPE_CORE_CARD_WEIGHT,
+	ARCHETYPE_TECH_CARD_THRESHOLD: ARCHETYPE_TECH_CARD_WEIGHT,
+}
+
+
+def calculate_signature_weights(training_data, thresholds=default_thresholds):
+	# For each archetype generate new signatures.
+	raw_new_weights = {}
+	for archetype_id, training_decks in training_data.items():
+		raw_new_weights[archetype_id] = calculate_signature_weights_for_archetype(
+			training_decks,
+			thresholds
+		)
+
+	final_new_weights = {}
+
+	# Then apply the cross-cluster-prevalence scaling
+	for archetype_id, weights in raw_new_weights.items():
+		weights_copy = copy(raw_new_weights)
+		del weights_copy[archetype_id]
+		final_new_weights[archetype_id] = apply_cross_cluster_prevalence(
+			weights,
+			weights_copy
+		)
+	return final_new_weights
+
+
+def apply_cross_cluster_prevalence(weights, all_other_weights):
+	ret = {}
+
+	num_other_archetypes = len(all_other_weights)
+	for dbf_id, weight in weights.items():
+
+		count_in_other_archetypes = 0
+		for other_archetype, other_weights in all_other_weights.items():
+			if dbf_id in other_weights:
+				count_in_other_archetypes += 1
+
+		cluster_freq_modifier = _calc_cross_cluster_modifier(
+			count_in_other_archetypes,
+			num_other_archetypes
+		)
+
+		ret[dbf_id] = weight * cluster_freq_modifier
+
+	return ret
+
+
+def calculate_signature_weights_for_archetype(training_decks, thresholds):
 	prevalence_counts = {}
 	deck_occurrences = 0
 
-	for digest, cards in matching_decks.items():
-		obs_count = observation_counts[digest]
+	for digest, deck_data in training_decks.items():
+		obs_count = deck_data["total_games"]
 		deck_occurrences += obs_count
-		for include in cards:
-			key = (include["card_id"], include["dbf_id"])
-			if key not in prevalence_counts:
-				prevalence_counts[key] = 0
-			prevalence_counts[key] += obs_count
+		for dbf_id, count in deck_data["cards"].items():
+			if dbf_id not in prevalence_counts:
+				prevalence_counts[dbf_id] = 0
+			prevalence_counts[dbf_id] += obs_count
 
 	if not deck_occurrences:
 		# Could not find any matching deck, break early
 		return []
 
-	return calculate_prevalences(prevalence_counts, deck_occurrences, thresholds, other_sigs)
+	return calculate_prevalences(prevalence_counts, deck_occurrences, thresholds)
 
 
-def calculate_prevalences(prevalence_counts, deck_occurrences, thresholds, other_sigs):
-	ret = []
+def calculate_prevalences(prevalence_counts, deck_occurrences, thresholds):
+	ret = {}
 
-	for (card_id, dbf_id), observation_count in prevalence_counts.items():
+	for dbf_id, observation_count in prevalence_counts.items():
 		prevalence = float(observation_count) / float(deck_occurrences)
-
-		count_in_other_archetypes = sum(
-			other_sigs.values(),
-			key=lambda x: int(dbf_id in x)
-		)
-		cluster_freq_modifier = _calc_cross_cluster_modifier(count_in_other_archetypes, len(other_sigs))
 
 		for threshold in sorted(thresholds.keys(), reverse=True):
 			if prevalence >= threshold:
-				weight = float(threshold) * prevalence * cluster_freq_modifier
-				ret.append(({"card_id": card_id, "dbf_id": dbf_id}, weight))
+				weight = float(thresholds[threshold]) * prevalence
+				ret[dbf_id] = weight
 				break
 
 	return ret
@@ -48,7 +99,7 @@ def _calc_cross_cluster_modifier(count_in_other_archetypes, num_other_archetypes
 	return cluster_freq_modifier
 
 
-def classify_deck(deck, archetype_ids, signature_weights, distance_cutoff):
+def classify_deck(deck, archetype_ids, signature_weights, distance_cutoff=0.25):
 	distances = []
 	for archetype_id in archetype_ids:
 		distance = 0
@@ -60,27 +111,9 @@ def classify_deck(deck, archetype_ids, signature_weights, distance_cutoff):
 					# but we must also normalize for that somehow
 			distance /= sum(signature_weights[archetype_id].values())
 
-
-		if distance and distance >= 0.25: #distance_cutoff:
+		if distance and distance >= distance_cutoff:
 			distances.append((archetype_id, distance))
 
 	if distances:
 		distances = sorted(distances, key=lambda t: t[1], reverse=True)
 		return distances[0][0]
-
-
-# ToDo:
-	# Regenerate all signatures for a class at the same time
-	# Figure out distance cutoff?
-	# Write a reprocess command, e.g. water rogue and elemental rogue
-	# Add component category names to SignatureComponent
-	# Write a big ass test suite
-	# Add instrumentation around match strengths, frequency, distance to second best match
-	# Dealing with multiple close matches (e.g. 3 signature matches within 1% of each other)
-		# Throw it all out
-		# Randomly pick one
-		# Let the highest value win.
-		# Select the most popular archetype
-		# Use the one with strongest single card match
-		# Look at other features, e.g. game duration
-
