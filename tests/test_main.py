@@ -3,13 +3,12 @@ import os
 import pytest
 from hearthstone.enums import CardClass
 from hsarchetypes import (
-	calculate_signature_weights, classify_deck, _calc_cross_cluster_modifier
+	_calc_cross_cluster_modifier, calculate_signature_weights, classify_deck
 )
-from tests.conftest import FIXTURE_SUITE
+from .conftest import FIXTURE_SUITE
 
 
 def test_calc_cross_cluster_modifier():
-
 	assert _calc_cross_cluster_modifier(0, 0) == 1
 
 	assert _calc_cross_cluster_modifier(0, 1) == 1
@@ -28,26 +27,18 @@ def test_calc_cross_cluster_modifier():
 def test_signature_components(dbf_db):
 	for snapshot in os.listdir(FIXTURE_SUITE):
 		snapshot_path = os.path.join(FIXTURE_SUITE, snapshot)
+		with open(snapshot_path, "r") as f:
+			data = json.load(f)
 
-		archetype_map_path = os.path.join(snapshot_path, "archetype_map.json")
-		if os.path.exists(archetype_map_path):
-			archetype_map = json.loads(open(archetype_map_path).read())
-		else:
-			archetype_map = {}
+		archetype_map = data["archetype_map"]
 
 		for game_format in ("FT_STANDARD", "FT_WILD"):
-			format_path = os.path.join(snapshot_path, game_format)
 			for player_class in CardClass:
 				if CardClass.DRUID <= player_class <= CardClass.WARRIOR:
-					training_file = "%s_training_decks.json" % player_class.name
-					training_path = os.path.join(format_path, training_file)
-					training_data = json.loads(open(training_path).read())
-
+					class_data = data[game_format][player_class.name]
+					training_data = class_data["training"]
+					validation_data = class_data["validation"]
 					new_weights = calculate_signature_weights(training_data)
-
-					validation_file = "%s_validation_decks.json" % player_class.name
-					validation_path = os.path.join(format_path, validation_file)
-					validation_data = json.loads(open(validation_path).read())
 
 					for expected_id, validation_decks in validation_data.items():
 						for digest, validation_deck in validation_decks.items():
