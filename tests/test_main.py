@@ -26,7 +26,7 @@ def test_calc_cross_cluster_modifier():
 
 @pytest.mark.parametrize(
 	'game_format',
-	["FT_STANDARD", ] # "FT_WILD"]
+	["FT_STANDARD", "FT_WILD"]
 )
 @pytest.mark.parametrize(
 	'player_class_name',
@@ -34,7 +34,7 @@ def test_calc_cross_cluster_modifier():
 )
 def test_signature_components(dbf_db, game_format, player_class_name):
 	for snapshot in os.listdir(FIXTURE_SUITE):
-		print("Fixture: %s" % snapshot)
+		print("\n\n*** Fixture: %s ***" % snapshot)
 
 		snapshot_path = os.path.join(FIXTURE_SUITE, snapshot)
 		with open(snapshot_path, "r") as f:
@@ -45,9 +45,13 @@ def test_signature_components(dbf_db, game_format, player_class_name):
 		class_data = data[game_format][player_class.name]
 		training_data = class_data["training"]
 		validation_data = class_data["validation"]
+
 		new_weights = calculate_signature_weights(training_data)
+		print_pretty_weights(new_weights, archetype_map, dbf_db)
 
 		for expected_id, validation_decks in validation_data.items():
+			print("Validating: %s" % archetype_map.get(expected_id, ""))
+
 			for digest, validation_deck in validation_decks.items():
 				deck = validation_deck["cards"]
 				assigned_id = classify_deck(
@@ -65,8 +69,15 @@ def test_signature_components(dbf_db, game_format, player_class_name):
 					digest,
 					to_pretty_deck(dbf_db, deck)
 				)
-
 				assert assigned_id == expected_id, msg
+
+
+def print_pretty_weights(archetype_weights, archetype_map, dbf_db):
+	for archetype_id, weights in archetype_weights.items():
+		archetype_name = archetype_map[archetype_id]
+		print("Archetype: %s" % archetype_name)
+		for dbf_id, weight in sorted(weights.items(), key=lambda t: t[1], reverse=True):
+			print("Weight: %s, Card: %s" % (round(weight, 3), dbf_db[int(dbf_id)].name))
 
 
 def to_pretty_deck(dbf_db, deck):
