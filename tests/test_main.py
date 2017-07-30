@@ -70,8 +70,8 @@ def test_signature_components(dbf_db, game_format, player_class_name):
 
 
 def to_pretty_deck(dbf_db, deck):
-	result = []
-	for dbf_id, count in deck.items():
-		for i in range(count):
-			result.append(dbf_db[int(dbf_id)].name)
-	return "\n".join(sorted(result))
+	card_map = {dbf_db[int(dbf_id)]: count for dbf_id, count in deck.items()}
+	alpha_sorted = sorted(card_map.items(), key=lambda t: t[0].name)
+	mana_sorted = sorted(alpha_sorted, key=lambda t: t[0].cost)
+	value_map = ["%s x %i" % (t[0].name, t[1]) for t in mana_sorted]
+	return "[%s]" % (", ".join(value_map))
