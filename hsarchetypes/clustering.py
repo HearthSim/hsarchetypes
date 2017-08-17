@@ -11,7 +11,7 @@ from .utils import card_db, dbf_id_vector
 
 NUM_CLUSTERS = 10
 LOW_VOLUME_CLUSTER_MULTIPLIER = 1.5
-INHERITENCE_THRESHOLD = .9
+INHERITENCE_THRESHOLD = .75
 
 
 def cluster_similarity(c1, c2):
@@ -216,8 +216,8 @@ class ClassClusters:
 						best_match_score = similarity
 						best_match_cluster = previous_cluster
 			if best_match_cluster:
-				current_cluster.inherit_from_previous(previous_cluster)
-				consumed_external_cluster_ids.add(previous_cluster.external_id)
+				current_cluster.inherit_from_previous(best_match_cluster)
+				consumed_external_cluster_ids.add(best_match_cluster.external_id)
 
 	def update_cluster_signatures(self):
 		signature_weights = calculate_signature_weights(self)
