@@ -4,7 +4,7 @@ from .conftest import CLUSTERING_DATA
 from hsarchetypes.clustering import ClusterSet
 
 
-def test_clustering():
+def test_clustering_cross_validation():
 	for data_set in os.listdir(CLUSTERING_DATA):
 		print("\n\n*** Fixture: %s ***" % data_set)
 
@@ -13,4 +13,4 @@ def test_clustering():
 
 		cluster_set = ClusterSet.create_cluster_set(data)
 		chart_data = cluster_set.to_chart_data()
-		print(json.dumps(chart_data))
+		assert chart_data is not None

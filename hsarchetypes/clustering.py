@@ -147,10 +147,12 @@ def _most_similar_pair(clusters, distance_function, observation_threshold):
 class Cluster:
 	"""A cluster is defined by a collection of decks and a signature of card weights."""
 
-	def __init__(self, cluster_id, decks, signature=None):
+	def __init__(self, cluster_id, decks, signature=None, name=None, external_id=None):
 		self.cluster_id = cluster_id
 		self.decks = decks
 		self.signature = signature
+		self.name = name
+		self.external_id = None
 		for deck in decks:
 			deck["cluster_id"] = cluster_id
 
@@ -220,7 +222,48 @@ class ClusterSet:
 		return str(self)
 
 	@classmethod
-	def create_cluster_set(cls, input_data):
+	def create_cluster_set(cls, input_data, consolidate=True):
+		"""
+		Expected input_data format:
+
+		{
+			"DRUID": [
+				...
+			],
+			"PALADIN": [
+				{
+					"observations": 265,
+					"decklist": "[Acherus Veteran x 2, Argent Squire x 2, ...],
+					"deck_id": 326974234,
+					"url": "https://hsreplay.net/decks/xkWJYJTH6KWTdwwpQucxsg",
+					"cards": {
+						"45392": 1,
+						"42467": 2,
+						"41139": 2,
+						"38745": 2,
+						"41145": 1,
+						"757": 2,
+						"42773": 2,
+						"41864": 1,
+						"679": 2,
+						"40465": 1,
+						"38740": 2,
+						"42462": 2,
+						"847": 2,
+						"1022": 2,
+						"943": 2,
+						"878": 2,
+						"42469": 2
+					},
+					"win_rate": 50.42,
+					"avg_num_turns": 17.0
+				},
+				{
+					...
+				}
+			],
+		}
+		"""
 		data = deepcopy(input_data)
 		base_vector = dbf_id_vector()
 
@@ -255,10 +298,14 @@ class ClusterSet:
 
 			clusters = [Cluster(id, decks) for id, decks in decks_in_cluster.items()]
 			class_cluster = ClassClusters(player_class, clusters)
-			class_cluster.consolidate_clusters()
+			if consolidate:
+				class_cluster.consolidate_clusters()
 			class_clusters.append(class_cluster)
 
 		return ClusterSet(class_clusters)
+
+	def inherit_names(self, previous_clusters):
+		pass
 
 	def items(self):
 		for class_cluster in self.class_clusters:
