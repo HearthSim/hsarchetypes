@@ -376,6 +376,8 @@ class ClusterSet:
 						"archetype_name": str(deck["cluster_id"]),
 						"archetype": int(deck["cluster_id"]),
 						"url": deck["url"],
+						"deck_id": deck["deck_id"],
+						"shortid": deck["shortid"],
 						"deck_list": deck["card_list"],
 						"pretty_decklist": deck["decklist"]
 					}
