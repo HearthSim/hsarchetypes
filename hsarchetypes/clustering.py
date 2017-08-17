@@ -6,7 +6,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from .signatures import calculate_signature_weights
-from .utils import dbf_id_vector
+from .utils import card_db, dbf_id_vector
 
 
 NUM_CLUSTERS = 10
@@ -171,6 +171,14 @@ class Cluster:
 	def inherit_from_previous(self, previous_class_cluster):
 		self.name = previous_class_cluster.name
 		self.external_id = previous_class_cluster.external_id
+
+	def pretty_signature_string(self, sep=", "):
+		db = card_db()
+		components = {}
+		for dbf_id, weight in self.signature.items():
+			components[db[int(dbf_id)].name] = weight
+		sorted_components = sorted(components.items(), key=lambda t: t[1], reverse=True)
+		return sep.join(["%s - %s" % (n, str(round(w, 2))) for n, w in sorted_components])
 
 
 class ClassClusters:
