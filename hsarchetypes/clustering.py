@@ -11,6 +11,7 @@ from .utils import dbf_id_vector
 
 NUM_CLUSTERS = 10
 LOW_VOLUME_CLUSTER_MULTIPLIER = 1.5
+INHERITENCE_THRESHOLD = .9
 
 
 def cluster_similarity(c1, c2):
@@ -152,7 +153,7 @@ class Cluster:
 		self.decks = decks
 		self.signature = signature
 		self.name = name
-		self.external_id = None
+		self.external_id = external_id
 		for deck in decks:
 			deck["cluster_id"] = cluster_id
 
@@ -166,6 +167,10 @@ class Cluster:
 	@property
 	def observations(self):
 		return sum(d["observations"] for d in self.decks)
+
+	def inherit_from_previous(self, previous_class_cluster):
+		self.name = previous_class_cluster.name
+		self.external_id = previous_class_cluster.external_id
 
 
 class ClassClusters:
@@ -185,6 +190,16 @@ class ClassClusters:
 		# Act like a dictionary when passed to calculate_signature_weights(...)
 		for cluster in self.clusters:
 			yield (cluster.cluster_id, cluster.decks)
+
+	def inherit_from_previous(self, previous_class_cluster):
+		consumed_external_cluster_ids = set()
+		for current_cluster in self.clusters:
+			for previous_cluster in previous_class_cluster.clusters:
+				if previous_cluster.external_id not in consumed_external_cluster_ids:
+					similarity = cluster_similarity(previous_cluster, current_cluster)
+					if similarity >= INHERITENCE_THRESHOLD:
+						current_cluster.inherit_from_previous(previous_cluster)
+						consumed_external_cluster_ids.add(previous_cluster.external_id)
 
 	def update_cluster_signatures(self):
 		signature_weights = calculate_signature_weights(self)
@@ -313,8 +328,11 @@ class ClusterSet:
 
 		return ClusterSet(class_clusters)
 
-	def inherit_names(self, previous_clusters):
-		pass
+	def inherit_from_previous(self, previous_cluster_set):
+		for previous_class_cluster in previous_cluster_set.class_clusters:
+			for current_class_cluster in self.class_clusters:
+				if current_class_cluster.player_class == previous_cluster_set.player_class:
+					current_class_cluster.inherit_from_previous(previous_class_cluster)
 
 	def items(self):
 		for class_cluster in self.class_clusters:
