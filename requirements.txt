@@ -1,0 +1,3 @@
+hearthstone
+numpy
+scikit-learn[alldeps]

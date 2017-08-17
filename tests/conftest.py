@@ -7,6 +7,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DATA_DIR = os.path.join(BASE_DIR, "testdata")
 LOG_DATA_GIT = "https://github.com/HearthSim/hsreplay-test-data"
 FIXTURE_SUITE = os.path.join(LOG_DATA_DIR, "archetype-fixtures")
+CLUSTERING_DATA = os.path.join(LOG_DATA_DIR, "clustering-data")
 
 
 def pytest_configure(config):
