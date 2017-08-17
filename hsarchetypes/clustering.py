@@ -158,8 +158,9 @@ class Cluster:
 			deck["cluster_id"] = cluster_id
 
 	def __str__(self):
-		template = "Cluster %i - %i decks - %i observations"
-		return template % (self.cluster_id, len(self.decks), self.observations)
+		c_id = self.cluster_id or self.name or self.external_id
+		template = "Cluster %s - %i decks - %i observations"
+		return template % (str(c_id), len(self.decks), self.observations)
 
 	def __repr__(self):
 		return str(self)
