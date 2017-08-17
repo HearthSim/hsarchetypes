@@ -26,7 +26,7 @@ def cluster_similarity(c1, c2):
 	values = {}
 	for c in union:
 		if c in c1_signature and c in c2_signature:
-			values[c] = (c1_signature[c] + c2_signature[c]) / 2
+			values[c] = float((c1_signature[c] + c2_signature[c])) / 2.0
 		elif c in c1_signature:
 			values[c] = c1_signature[c]
 		else:
@@ -40,7 +40,11 @@ def cluster_similarity(c1, c2):
 	for c in union:
 		w_union += values[c]
 
-	weighted_score = float(w_intersection) / float(w_union)
+	if w_union == 0.0:
+		weighted_score = 0.0
+	else:
+		weighted_score = float(w_intersection) / float(w_union)
+
 	return weighted_score
 
 
@@ -80,7 +84,7 @@ def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
 	std = np.std(wr, axis=0)
 	max_val = np.max(wr, axis=0)
 	min_val = np.min(wr, axis=0)
-	observation_threshold = mean / LOW_VOLUME_CLUSTER_MULTIPLIER  # or 3
+	observation_threshold = float(mean) / float(LOW_VOLUME_CLUSTER_MULTIPLIER)  # or 3
 	# print "observations: %s" % observations
 	# print "observation tresh: %s, mean:%s, std:%s (can't be above)\n" % (round(observation_threshold, 2), round(mean,2), round(std, 2))
 
@@ -203,12 +207,17 @@ class ClassClusters:
 	def inherit_from_previous(self, previous_class_cluster):
 		consumed_external_cluster_ids = set()
 		for current_cluster in self.clusters:
+			best_match_score = 0.0
+			best_match_cluster = None
 			for previous_cluster in previous_class_cluster.clusters:
 				if previous_cluster.external_id not in consumed_external_cluster_ids:
 					similarity = cluster_similarity(previous_cluster, current_cluster)
-					if similarity >= INHERITENCE_THRESHOLD:
-						current_cluster.inherit_from_previous(previous_cluster)
-						consumed_external_cluster_ids.add(previous_cluster.external_id)
+					if similarity >= INHERITENCE_THRESHOLD and similarity > best_match_score:
+						best_match_score = similarity
+						best_match_cluster = previous_cluster
+			if best_match_cluster:
+				current_cluster.inherit_from_previous(previous_cluster)
+				consumed_external_cluster_ids.add(previous_cluster.external_id)
 
 	def update_cluster_signatures(self):
 		signature_weights = calculate_signature_weights(self)
