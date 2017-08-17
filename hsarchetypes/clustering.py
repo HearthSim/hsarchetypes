@@ -150,13 +150,12 @@ class Cluster:
 
 	def __init__(self, cluster_id, decks, signature=None, name=None, external_id=None):
 		self.cluster_id = cluster_id
-		self.decks = decks
+		self.decks = decks or []
 		self.signature = signature
 		self.name = name
 		self.external_id = external_id
-		if self.decks:
-			for deck in self.decks:
-				deck["cluster_id"] = cluster_id
+		for deck in self.decks:
+			deck["cluster_id"] = cluster_id
 
 	def __str__(self):
 		template = "Cluster %i - %i decks - %i observations"
@@ -236,6 +235,12 @@ class ClusterSet:
 
 	def __repr__(self):
 		return str(self)
+
+	def get_class_cluster_by_name(self, player_class_name):
+		for class_cluster in self.class_clusters:
+			if class_cluster.player_class == player_class_name:
+				return class_cluster
+		return None
 
 	@classmethod
 	def create_cluster_set(cls, input_data, consolidate=True, discard_trivial_clusters=True):
