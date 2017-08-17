@@ -367,6 +367,7 @@ class ClusterSet:
 						"archetype_name": str(deck["cluster_id"]),
 						"archetype": int(deck["cluster_id"]),
 						"url": deck["url"],
+						"deck_list": deck["card_list"],
 						"pretty_decklist": deck["decklist"]
 					}
 					player_class_result["data"].append({
