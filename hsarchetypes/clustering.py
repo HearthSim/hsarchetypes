@@ -346,7 +346,7 @@ class ClusterSet:
 	def inherit_from_previous(self, previous_cluster_set):
 		for previous_class_cluster in previous_cluster_set.class_clusters:
 			for current_class_cluster in self.class_clusters:
-				if current_class_cluster.player_class == previous_cluster_set.player_class:
+				if current_class_cluster.player_class == previous_class_cluster.player_class:
 					current_class_cluster.inherit_from_previous(previous_class_cluster)
 
 	def items(self):
