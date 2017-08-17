@@ -222,7 +222,7 @@ class ClusterSet:
 		return str(self)
 
 	@classmethod
-	def create_cluster_set(cls, input_data, consolidate=True):
+	def create_cluster_set(cls, input_data, consolidate=True, discard_trivial_clusters=True):
 		"""
 		Expected input_data format:
 
@@ -298,8 +298,17 @@ class ClusterSet:
 
 			clusters = [Cluster(id, decks) for id, decks in decks_in_cluster.items()]
 			class_cluster = ClassClusters(player_class, clusters)
+
 			if consolidate:
 				class_cluster.consolidate_clusters()
+
+			if discard_trivial_clusters:
+				cc_clusters = class_cluster.clusters
+				dist, obs_threshold = _analyze_cluster_space(cc_clusters)
+
+				final_clusters = [c for c in cc_clusters if c.observations >= obs_threshold]
+				class_cluster = ClassClusters(player_class, final_clusters)
+
 			class_clusters.append(class_cluster)
 
 		return ClusterSet(class_clusters)
