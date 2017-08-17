@@ -154,8 +154,9 @@ class Cluster:
 		self.signature = signature
 		self.name = name
 		self.external_id = external_id
-		for deck in decks:
-			deck["cluster_id"] = cluster_id
+		if self.decks:
+			for deck in self.decks:
+				deck["cluster_id"] = cluster_id
 
 	def __str__(self):
 		template = "Cluster %i - %i decks - %i observations"
