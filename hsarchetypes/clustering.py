@@ -417,10 +417,10 @@ class ClusterSet:
 				X.append(vector)
 
 			if len(decks) > 1:
-				# from sklearn import manifold
-				# tsne = manifold.TSNE(n_components=2, init='pca', random_state=0)
-				# xy = tsne.fit_transform(X)
-				xy = PCA(n_components=2).fit_transform(deepcopy(X))
+				from sklearn import manifold
+				tsne = manifold.TSNE(n_components=2, init='pca', random_state=0)
+				xy = tsne.fit_transform(X)
+				# xy = PCA(n_components=2).fit_transform(deepcopy(X))
 				for (x, y), deck in zip(xy, decks):
 					deck["x"] = float(x)
 					deck["y"] = float(y)
