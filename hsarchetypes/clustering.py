@@ -515,7 +515,8 @@ class ClusterSet:
 				"signatures": {}
 			}
 			for cluster in clusters:
-				player_class_result["signatures"][cluster.cluster_id] = cluster.signature
+				sig = [[int(dbf), weight] for dbf, weight in cluster.signature.items()]
+				player_class_result["signatures"][cluster.cluster_id] = sig
 				for deck in cluster.decks:
 					metadata = {
 						"games": int(deck["observations"]),
