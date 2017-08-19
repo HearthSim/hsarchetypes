@@ -73,7 +73,7 @@ def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
 	wr = np.array(distances_all)
 	mean = np.mean(wr, axis=0)
 	std = np.std(wr, axis=0)
-	distance_threshold = mean + (std * 2.2)  # or 3
+	distance_threshold = mean + (std * 2.4)  # or 3
 	# print "distance tresh: %s, mean:%s, std:%s\n" % (round(distance_threshold, 2), round(mean,2), round(std, 2))
 
 	observations = []
@@ -124,6 +124,10 @@ def _most_similar_pair(clusters, distance_function, observation_threshold):
 	for c1, c2 in combinations(clusters, 2):
 		if c1.observations > observation_threshold and c2.observations > observation_threshold:
 			continue
+
+		if not c1.can_merge(c2):
+			continue
+
 		# cluster_ids.add("c%s" % c1.cluster_id)
 		# cluster_ids.add("c%s" % c2.cluster_id)
 
@@ -158,6 +162,7 @@ class Cluster:
 		self.signature = signature
 		self.name = name
 		self.external_id = external_id
+		self.rules = []
 		for deck in self.decks:
 			deck["cluster_id"] = cluster_id
 
@@ -172,6 +177,25 @@ class Cluster:
 	@property
 	def observations(self):
 		return sum(d["observations"] for d in self.decks)
+
+	@property
+	def single_deck_max_observations(self):
+		return max(d["observations"] for d in self.decks)
+
+	def can_merge(self, other_cluster):
+		meets_self_rules = True
+		for r in self.rules:
+			for d in other_cluster.decks:
+				if not r(d):
+					meets_self_rules = False
+
+		meets_other_rules = True
+		for r in other_cluster.rules:
+			for d in self.decks:
+				if not r(d):
+					meets_other_rules = False
+
+		return meets_other_rules and meets_self_rules
 
 	def inherit_from_previous(self, previous_class_cluster):
 		self.name = previous_class_cluster.name
@@ -239,6 +263,15 @@ class ClassClusters:
 		success = len(new_clusters) < len(self.clusters)
 		self.clusters = new_clusters
 		return success
+
+
+def is_highlander_deck(deck):
+	return len(deck["cards"]) == 30
+
+
+FALSE_POSITIVE_RULES = [
+	is_highlander_deck
+]
 
 
 class ClusterSet:
@@ -312,6 +345,9 @@ class ClusterSet:
 			for deck in decks:
 				cards = deck["cards"]
 				vector = [int(cards.get(str(dbf_id), 0)) for dbf_id in base_vector]
+				#[aggro, mid, control, highlander]
+				#[murloc, pirate, totem, dragon]
+				# vector.append([])
 				X.append(vector)
 
 			if len(decks) > 1:
@@ -334,26 +370,43 @@ class ClusterSet:
 			decks_in_cluster = defaultdict(list)
 			for deck, cluster_id in zip(decks, clusterizer.labels_):
 				decks_in_cluster[int(cluster_id)].append(deck)
+			initial_clusters = [Cluster(id, decks) for id, decks in decks_in_cluster.items()]
 
-			clusters = [Cluster(id, decks) for id, decks in decks_in_cluster.items()]
-			class_cluster = ClassClusters(player_class, clusters)
+			next_cluster_id = max(decks_in_cluster.keys()) + 1
+			final_clusters = []
+			for cluster in initial_clusters:
+				for rule in FALSE_POSITIVE_RULES:
+					# If any decks match the rule than split the cluster
+					if any(rule(d) for d in cluster.decks):
+						matches= Cluster(next_cluster_id, [d for d in decks if rule(d)])
+						matches.rules.append(rule)
+						final_clusters.append(matches)
+						next_cluster_id += 1
+
+						misses = Cluster(next_cluster_id, [d for d in decks if not rule(d)])
+						final_clusters.append(misses)
+						next_cluster_id += 1
+					else:
+						final_clusters.append(cluster)
+
+			class_cluster = ClassClusters(player_class, final_clusters)
 
 			if consolidate:
 				class_cluster.consolidate_clusters()
 
 			if discard_trivial_clusters:
-				cc_clusters = class_cluster.clusters
-				dist, obs_threshold = _analyze_cluster_space(cc_clusters)
+				final_clusters = []
+				misc_cluster_decks = []
+				for cluster in class_cluster.clusters:
+					# check single_deck_max to make sure there will be at least one deck
+					# eligible for global stats
+					if cluster.observations >= 1000 and cluster.single_deck_max_observations >= 1000:
+						final_clusters.append(cluster)
+					else:
+						misc_cluster_decks.extend(cluster.decks)
 
-				final_clusters = [c for c in cc_clusters if c.observations >= 1000]
-
-				low_volume_clusters = [c for c in cc_clusters if c.observations < 1000]
-				low_volume_decks = []
-				for cluster in low_volume_clusters:
-					low_volume_decks.extend(cluster.decks)
-
-				garbage_cluster = Cluster(-1, low_volume_decks)
-				final_clusters.append(garbage_cluster)
+				misc_cluster = Cluster(-1, misc_cluster_decks )
+				final_clusters.append(misc_cluster)
 
 				class_cluster = ClassClusters(player_class, final_clusters)
 
