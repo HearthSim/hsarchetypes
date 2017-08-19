@@ -5,14 +5,15 @@ import numpy as np
 from hearthstone.enums import GameTag
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 from .signatures import calculate_signature_weights
 from .utils import card_db, dbf_id_vector
 
 
-NUM_CLUSTERS = 6
+NUM_CLUSTERS = 10
 LOW_VOLUME_CLUSTER_MULTIPLIER = 1.5
 INHERITENCE_THRESHOLD = .75
+SMALL_CLUSTER_CUTOFF = 1500
+SIMILARITY_THRESHOLD_FLOOR = .25
 
 
 db = card_db()
@@ -77,24 +78,15 @@ def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
 	wr = np.array(distances_all)
 	mean = np.mean(wr, axis=0)
 	std = np.std(wr, axis=0)
-	similarity_threshold = mean + (std * 2)  # or 3
+
+	similarity_threshold = max(SIMILARITY_THRESHOLD_FLOOR, mean + (std * 1.8))
 	# similarity_threshold is how similar two clusters must be to be eligible to be merged
 	# As this value gets larger, we will be less aggressive about merging clusters
-	print("\nsimilarity threshold: %s, mean:%s, std:%s\n" % (round(similarity_threshold, 2), round(mean,2), round(std, 2)))
+	msg = "\nsimilarity threshold: %s, mean:%s, std:%s\n"
+	values = (round(similarity_threshold, 2), round(mean,2), round(std, 2))
+	print(msg % values)
 
-	observations = []
-	for cluster in clusters:
-		observations.append(cluster.observations)
-	wr = np.array(observations)
-	mean = np.mean(wr, axis=0)
-	std = np.std(wr, axis=0)
-	max_val = np.max(wr, axis=0)
-	min_val = np.min(wr, axis=0)
-	observation_threshold = float(mean) / float(LOW_VOLUME_CLUSTER_MULTIPLIER)  # or 3
-	# print("observations: %s" % observations)
-	# print("observation thresh: %s, mean:%s, std:%s (can't be above)\n" % (round(observation_threshold, 2), round(mean,2), round(std, 2)))
-
-	return similarity_threshold, observation_threshold
+	return similarity_threshold
 
 
 def _do_merge_clusters(clusters, distance_function, minimum_simularity):
@@ -115,11 +107,8 @@ def _do_merge_clusters(clusters, distance_function, minimum_simularity):
 	new_cluster_decks.extend(c1.decks)
 	new_cluster_decks.extend(c2.decks)
 	new_cluster = Cluster(
-		# self,
 		next_cluster_id,
 		new_cluster_decks,
-		# parents=[c1, c2],
-		# parent_similarity=sim_score
 	)
 	next_clusters_list = [new_cluster]
 	for c in current_clusters:
@@ -130,35 +119,15 @@ def _do_merge_clusters(clusters, distance_function, minimum_simularity):
 
 def _most_similar_pair(clusters, distance_function):
 	result = []
-	# history = []
-	# cluster_ids = set()
-	for c1, c2 in combinations(clusters, 2):
-		# if c1.observations > observation_threshold and c2.observations > observation_threshold:
-		# 	print("%s\n%s\nToo Many Observations To Merge " % (str(c1), str(c2)))
-		# 	continue
 
+	for c1, c2 in combinations(clusters, 2):
 		if not c1.can_merge(c2):
 			# print("%s\n%s\nCannot Merge" % (str(c1), str(c2)))
 			continue
 
-		# cluster_ids.add("c%s" % c1.cluster_id)
-		# cluster_ids.add("c%s" % c2.cluster_id)
-
 		sim_score = distance_function(c1, c2)
 		result.append((c1, c2, sim_score))
-	# history.append({
-	# 		"c1": "c%s" % c1.cluster_id,
-	# 		"c2": "c%s" % c2.cluster_id,
-	# 		"value": round(sim_score, 3)
-	# 	})
-	#
-	# # Used for pretty printing cluster merging
-	# self.merge_history[str(self._merge_pass)] = {
-	# 	"cluster_ids": sorted(list(cluster_ids)),
-	# 	"scores": history
-	# }
-	#
-	# self._merge_pass += 1
+
 	if len(result):
 		sorted_result = sorted(result, key=lambda t: t[2], reverse=True)
 		return sorted_result[0]
@@ -208,7 +177,8 @@ class Cluster:
 
 	@property
 	def pretty_decklists(self):
-		return [d["decklist"] for d in self.decks]
+		sorted_decks = list(sorted(self.decks, key=lambda d: d["observations"], reverse=True))
+		return [d["decklist"] for d in sorted_decks[:10]]
 
 	def can_merge(self, other_cluster):
 		for r in self.rules:
@@ -277,7 +247,7 @@ class ClassClusters:
 	def consolidate_clusters(self, distance_function=cluster_similarity):
 		consolidation_successful = True
 		self.update_cluster_signatures()
-		similarity_threshold, obsv = _analyze_cluster_space(self.clusters, distance_function)
+		similarity_threshold = _analyze_cluster_space(self.clusters, distance_function)
 		while consolidation_successful and len(self.clusters) > 1:
 			consolidation_successful = self._attempt_consolidation(similarity_threshold, distance_function)
 			self.update_cluster_signatures()
@@ -341,7 +311,7 @@ class ClusterSet:
 		cls,
 		input_data,
 		consolidate=True,
-		discard_trivial_clusters=True,
+		create_experimental_cluster=True,
 		use_mana_curve=True,
 		use_tribes=False,
 		use_card_types=False,
@@ -411,11 +381,13 @@ class ClusterSet:
 
 				if use_card_types:
 					# Weapon, Spell, Minion, Hero, Secret
-					vector.extend([])
+					# vector.extend([])
+					pass
 
 				if use_mechanics:
 					# Secret, Deathrattle, Battlecry, Lifesteal,
-					vector.extend([])
+					# vector.extend([])
+					pass
 
 				X.append(vector)
 
@@ -423,7 +395,6 @@ class ClusterSet:
 				from sklearn import manifold
 				tsne = manifold.TSNE(n_components=2, init='pca', random_state=0)
 				xy = tsne.fit_transform(X)
-				# xy = PCA(n_components=2).fit_transform(deepcopy(X))
 				for (x, y), deck in zip(xy, decks):
 					deck["x"] = float(x)
 					deck["y"] = float(y)
@@ -475,20 +446,20 @@ class ClusterSet:
 				print("\n\n****** Consolidating: %s ******" % player_class)
 				class_cluster.consolidate_clusters()
 
-			if discard_trivial_clusters:
+			if create_experimental_cluster:
 				final_clusters = []
-				misc_cluster_decks = []
+				experimental_cluster_decks = []
 				for cluster in class_cluster.clusters:
 					# check single_deck_max to make sure there will be at least one deck
 					# eligible for global stats
-					if cluster.observations >= 1000: # and cluster.single_deck_max_observations >= 1000:
+					if cluster.observations >= SMALL_CLUSTER_CUTOFF: # and cluster.single_deck_max_observations >= 1000:
 						final_clusters.append(cluster)
 					else:
-						misc_cluster_decks.extend(cluster.decks)
+						experimental_cluster_decks.extend(cluster.decks)
 
-				if len(misc_cluster_decks):
-					misc_cluster = Cluster(-1, misc_cluster_decks)
-					final_clusters.append(misc_cluster)
+				if len(experimental_cluster_decks):
+					experimental_cluster = Cluster(-1, experimental_cluster_decks)
+					final_clusters.append(experimental_cluster)
 
 				class_cluster = ClassClusters(player_class, final_clusters)
 				class_cluster.update_cluster_signatures()
@@ -523,12 +494,9 @@ class ClusterSet:
 						"games": int(deck["observations"]),
 						"archetype_name": str(deck["cluster_id"]),
 						"archetype": int(deck["cluster_id"]),
-						# "url": deck["url"],
-						# "deck_id": deck["deck_id"],
 						"win_rate": deck["win_rate"],
 						"shortid": deck.get("shortid", None),
 						"deck_list": deck.get("card_list", None),
-						# "pretty_decklist": deck["decklist"]
 					}
 					player_class_result["data"].append({
 						"x": deck["x"],
