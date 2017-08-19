@@ -73,7 +73,7 @@ def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
 	wr = np.array(distances_all)
 	mean = np.mean(wr, axis=0)
 	std = np.std(wr, axis=0)
-	distance_threshold = mean + (std * 2)  # or 3
+	distance_threshold = mean + (std * 2.2)  # or 3
 	# print "distance tresh: %s, mean:%s, std:%s\n" % (round(distance_threshold, 2), round(mean,2), round(std, 2))
 
 	observations = []
@@ -346,6 +346,15 @@ class ClusterSet:
 				dist, obs_threshold = _analyze_cluster_space(cc_clusters)
 
 				final_clusters = [c for c in cc_clusters if c.observations >= 1000]
+
+				low_volume_clusters = [c for c in cc_clusters if c.observations < 1000]
+				low_volume_decks = []
+				for cluster in low_volume_clusters:
+					low_volume_decks.extend(cluster.decks)
+
+				garbage_cluster = Cluster(-1, low_volume_decks)
+				final_clusters.append(garbage_cluster)
+
 				class_cluster = ClassClusters(player_class, final_clusters)
 
 			class_clusters.append(class_cluster)
@@ -377,8 +386,8 @@ class ClusterSet:
 						"archetype": int(deck["cluster_id"]),
 						"url": deck["url"],
 						"deck_id": deck["deck_id"],
-						"shortid": deck["shortid"],
-						"deck_list": deck["card_list"],
+						"shortid": deck.get("shortid", None),
+						"deck_list": deck.get("card_list", None),
 						"pretty_decklist": deck["decklist"]
 					}
 					player_class_result["data"].append({
