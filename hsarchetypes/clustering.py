@@ -10,7 +10,7 @@ from .signatures import calculate_signature_weights
 from .utils import card_db, dbf_id_vector
 
 
-NUM_CLUSTERS = 10
+NUM_CLUSTERS = 6
 LOW_VOLUME_CLUSTER_MULTIPLIER = 1.5
 INHERITENCE_THRESHOLD = .75
 
@@ -80,7 +80,7 @@ def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
 	similarity_threshold = mean + (std * 2)  # or 3
 	# similarity_threshold is how similar two clusters must be to be eligible to be merged
 	# As this value gets larger, we will be less aggressive about merging clusters
-	# print "distance tresh: %s, mean:%s, std:%s\n" % (round(distance_threshold, 2), round(mean,2), round(std, 2))
+	print("\nsimilarity threshold: %s, mean:%s, std:%s\n" % (round(similarity_threshold, 2), round(mean,2), round(std, 2)))
 
 	observations = []
 	for cluster in clusters:
@@ -91,19 +91,24 @@ def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
 	max_val = np.max(wr, axis=0)
 	min_val = np.min(wr, axis=0)
 	observation_threshold = float(mean) / float(LOW_VOLUME_CLUSTER_MULTIPLIER)  # or 3
-	# print "observations: %s" % observations
-	# print "observation tresh: %s, mean:%s, std:%s (can't be above)\n" % (round(observation_threshold, 2), round(mean,2), round(std, 2))
+	# print("observations: %s" % observations)
+	# print("observation thresh: %s, mean:%s, std:%s (can't be above)\n" % (round(observation_threshold, 2), round(mean,2), round(std, 2)))
 
 	return similarity_threshold, observation_threshold
 
 
-def _do_merge_clusters(clusters, distance_function, minimum_simularity, observation_threshold):
+def _do_merge_clusters(clusters, distance_function, minimum_simularity):
 	next_cluster_id = max([c.cluster_id for c in clusters]) + 1
 	current_clusters = list(clusters)
 
-	most_similar = _most_similar_pair(current_clusters, distance_function, observation_threshold)
+	most_similar = _most_similar_pair(current_clusters, distance_function)
+	if most_similar:
+		print("%s\n%s\nMost Similar Pair With Score: %s" % most_similar)
 	if not most_similar or most_similar[2] < minimum_simularity:
+		print("Does Not Meet Minimum Simularity")
 		return current_clusters
+	else:
+		print("They Will Be Merged")
 
 	c1, c2, sim_score = most_similar
 	new_cluster_decks = []
@@ -123,15 +128,17 @@ def _do_merge_clusters(clusters, distance_function, minimum_simularity, observat
 	return next_clusters_list
 
 
-def _most_similar_pair(clusters, distance_function, observation_threshold):
+def _most_similar_pair(clusters, distance_function):
 	result = []
 	# history = []
 	# cluster_ids = set()
 	for c1, c2 in combinations(clusters, 2):
-		if c1.observations > observation_threshold and c2.observations > observation_threshold:
-			continue
+		# if c1.observations > observation_threshold and c2.observations > observation_threshold:
+		# 	print("%s\n%s\nToo Many Observations To Merge " % (str(c1), str(c2)))
+		# 	continue
 
 		if not c1.can_merge(c2):
+			# print("%s\n%s\nCannot Merge" % (str(c1), str(c2)))
 			continue
 
 		# cluster_ids.add("c%s" % c1.cluster_id)
@@ -204,19 +211,17 @@ class Cluster:
 		return [d["decklist"] for d in self.decks]
 
 	def can_merge(self, other_cluster):
-		meets_self_rules = True
 		for r in self.rules:
 			for d in other_cluster.decks:
 				if not r(d):
-					meets_self_rules = False
+					return False
 
-		meets_other_rules = True
 		for r in other_cluster.rules:
 			for d in self.decks:
 				if not r(d):
-					meets_other_rules = False
+					return False
 
-		return meets_other_rules and meets_self_rules
+		return True
 
 	def inherit_from_previous(self, previous_class_cluster):
 		self.name = previous_class_cluster.name
@@ -271,16 +276,14 @@ class ClassClusters:
 
 	def consolidate_clusters(self, distance_function=cluster_similarity):
 		consolidation_successful = True
-		while consolidation_successful and len(self.clusters) > 1:
-			self.update_cluster_signatures()
-			consolidation_successful = self._attempt_consolidation(distance_function)
-
-		# Always update signatures after final consolidation
 		self.update_cluster_signatures()
-
-	def _attempt_consolidation(self, distance_function=cluster_similarity):
 		similarity_threshold, obsv = _analyze_cluster_space(self.clusters, distance_function)
-		new_clusters = _do_merge_clusters(self.clusters, distance_function, similarity_threshold, obsv)
+		while consolidation_successful and len(self.clusters) > 1:
+			consolidation_successful = self._attempt_consolidation(similarity_threshold, distance_function)
+			self.update_cluster_signatures()
+
+	def _attempt_consolidation(self, similarity_threshold, distance_function=cluster_similarity):
+		new_clusters = _do_merge_clusters(self.clusters, distance_function, similarity_threshold)
 		success = len(new_clusters) < len(self.clusters)
 		self.clusters = new_clusters
 		return success
@@ -447,15 +450,19 @@ class ClusterSet:
 				for cluster in clusters:
 
 					# If any decks match the rule than split the cluster
-					if any(rule(d) for d in cluster.decks) and not all(rule(d) for d in cluster.decks):
+					if any(rule(d) for d in cluster.decks):
 						matches = Cluster(next_cluster_id, [d for d in cluster.decks if rule(d)])
+						matches.rules.extend(cluster.rules)
 						matches.rules.append(rule)
 						next_clusters.append(matches)
 						next_cluster_id += 1
 
-						misses = Cluster(next_cluster_id, [d for d in cluster.decks if not rule(d)])
-						next_clusters.append(misses)
-						next_cluster_id += 1
+						deck_misses = [d for d in cluster.decks if not rule(d)]
+						if len(deck_misses):
+							misses = Cluster(next_cluster_id, deck_misses)
+							misses.rules.extend(cluster.rules)
+							next_clusters.append(misses)
+							next_cluster_id += 1
 					else:
 						next_clusters.append(cluster)
 				clusters = next_clusters
@@ -464,6 +471,7 @@ class ClusterSet:
 			class_cluster = ClassClusters(player_class, clusters)
 
 			if consolidate:
+				print("\n\n****** Consolidating: %s ******" % player_class)
 				class_cluster.consolidate_clusters()
 
 			if discard_trivial_clusters:
