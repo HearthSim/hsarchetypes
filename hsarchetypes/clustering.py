@@ -345,7 +345,7 @@ class ClusterSet:
 				cc_clusters = class_cluster.clusters
 				dist, obs_threshold = _analyze_cluster_space(cc_clusters)
 
-				final_clusters = [c for c in cc_clusters if c.observations >= obs_threshold]
+				final_clusters = [c for c in cc_clusters if c.observations >= 1000]
 				class_cluster = ClassClusters(player_class, final_clusters)
 
 			class_clusters.append(class_cluster)
