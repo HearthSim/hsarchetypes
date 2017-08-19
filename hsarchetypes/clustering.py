@@ -2,6 +2,7 @@ from collections import defaultdict
 from copy import deepcopy
 from itertools import combinations
 import numpy as np
+from hearthstone.enums import GameTag
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -12,6 +13,9 @@ from .utils import card_db, dbf_id_vector
 NUM_CLUSTERS = 10
 LOW_VOLUME_CLUSTER_MULTIPLIER = 1.5
 INHERITENCE_THRESHOLD = .75
+
+
+db = card_db()
 
 
 def cluster_similarity(c1, c2):
@@ -73,7 +77,9 @@ def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
 	wr = np.array(distances_all)
 	mean = np.mean(wr, axis=0)
 	std = np.std(wr, axis=0)
-	distance_threshold = mean + (std * 2.4)  # or 3
+	similarity_threshold = mean + (std * 2)  # or 3
+	# similarity_threshold is how similar two clusters must be to be eligible to be merged
+	# As this value gets larger, we will be less aggressive about merging clusters
 	# print "distance tresh: %s, mean:%s, std:%s\n" % (round(distance_threshold, 2), round(mean,2), round(std, 2))
 
 	observations = []
@@ -88,15 +94,15 @@ def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
 	# print "observations: %s" % observations
 	# print "observation tresh: %s, mean:%s, std:%s (can't be above)\n" % (round(observation_threshold, 2), round(mean,2), round(std, 2))
 
-	return distance_threshold, observation_threshold
+	return similarity_threshold, observation_threshold
 
 
-def _do_merge_clusters(clusters, distance_function, distance_threshold, observation_threshold):
+def _do_merge_clusters(clusters, distance_function, minimum_simularity, observation_threshold):
 	next_cluster_id = max([c.cluster_id for c in clusters]) + 1
 	current_clusters = list(clusters)
 
 	most_similar = _most_similar_pair(current_clusters, distance_function, observation_threshold)
-	if not most_similar or most_similar[2] < distance_threshold:
+	if not most_similar or most_similar[2] < minimum_simularity:
 		return current_clusters
 
 	c1, c2, sim_score = most_similar
@@ -167,12 +173,23 @@ class Cluster:
 			deck["cluster_id"] = cluster_id
 
 	def __str__(self):
-		c_id = self.cluster_id or self.name or self.external_id
-		template = "Cluster %s - %i decks - %i observations"
-		return template % (str(c_id), len(self.decks), self.observations)
+		c_id = None
+		if self.cluster_id is not None:
+			c_id = self.cluster_id
+		elif self.name:
+			c_id = self.name
+		elif self.external_id:
+			c_id = self.external_id
+
+		template = "Cluster %s - %i decks (%i games) - %s"
+		return template % (str(c_id), len(self.decks), self.observations, self.most_popular_deck["decklist"])
 
 	def __repr__(self):
 		return str(self)
+
+	@property
+	def most_popular_deck(self):
+		return list(sorted(self.decks, key=lambda d: d["observations"], reverse=True))[0]
 
 	@property
 	def observations(self):
@@ -181,6 +198,10 @@ class Cluster:
 	@property
 	def single_deck_max_observations(self):
 		return max(d["observations"] for d in self.decks)
+
+	@property
+	def pretty_decklists(self):
+		return [d["decklist"] for d in self.decks]
 
 	def can_merge(self, other_cluster):
 		meets_self_rules = True
@@ -258,8 +279,8 @@ class ClassClusters:
 		self.update_cluster_signatures()
 
 	def _attempt_consolidation(self, distance_function=cluster_similarity):
-		dist, obsv = _analyze_cluster_space(self.clusters, distance_function)
-		new_clusters = _do_merge_clusters(self.clusters, distance_function, dist, obsv)
+		similarity_threshold, obsv = _analyze_cluster_space(self.clusters, distance_function)
+		new_clusters = _do_merge_clusters(self.clusters, distance_function, similarity_threshold, obsv)
 		success = len(new_clusters) < len(self.clusters)
 		self.clusters = new_clusters
 		return success
@@ -269,9 +290,28 @@ def is_highlander_deck(deck):
 	return len(deck["cards"]) == 30
 
 
+def is_quest_deck(deck):
+	for dbf_id in deck["cards"]:
+		card = db[int(dbf_id)]
+		if GameTag.QUEST in card.tags:
+			return True
+	return False
+
+
 FALSE_POSITIVE_RULES = [
-	is_highlander_deck
+	is_highlander_deck,
+	is_quest_deck,
 ]
+
+
+def to_mana_curve_vector(deck):
+	num_cards = float(sum(deck["cards"].values()))
+	num_cards_by_cost = defaultdict(int)
+	for dbf_id, count in deck["cards"].items():
+		card = db[int(dbf_id)]
+		num_cards_by_cost[card.cost] += count
+
+	return [float(num_cards_by_cost[c]) / num_cards for c in range(0, 11)]
 
 
 class ClusterSet:
@@ -294,7 +334,16 @@ class ClusterSet:
 		return None
 
 	@classmethod
-	def create_cluster_set(cls, input_data, consolidate=True, discard_trivial_clusters=True):
+	def create_cluster_set(
+		cls,
+		input_data,
+		consolidate=True,
+		discard_trivial_clusters=True,
+		use_mana_curve=True,
+		use_tribes=False,
+		use_card_types=False,
+		use_mechanics=False,
+	):
 		"""
 		Expected input_data format:
 
@@ -344,13 +393,33 @@ class ClusterSet:
 			X = []
 			for deck in decks:
 				cards = deck["cards"]
-				vector = [int(cards.get(str(dbf_id), 0)) for dbf_id in base_vector]
-				#[aggro, mid, control, highlander]
-				#[murloc, pirate, totem, dragon]
-				# vector.append([])
+				vector = [float(cards.get(str(dbf_id), 0)) / 2.0 for dbf_id in base_vector]
+
+				for rule in FALSE_POSITIVE_RULES:
+					rule_outcome = rule(deck)
+					vector.append(float(rule_outcome))
+
+				if use_mana_curve:
+					mana_curve_vector = to_mana_curve_vector(deck)
+					vector.extend(mana_curve_vector)
+
+				if use_tribes:
+					vector.extend([])
+
+				if use_card_types:
+					# Weapon, Spell, Minion, Hero, Secret
+					vector.extend([])
+
+				if use_mechanics:
+					# Secret, Deathrattle, Battlecry, Lifesteal,
+					vector.extend([])
+
 				X.append(vector)
 
 			if len(decks) > 1:
+				# from sklearn import manifold
+				# tsne = manifold.TSNE(n_components=2, init='pca', random_state=0)
+				# xy = tsne.fit_transform(X)
 				xy = PCA(n_components=2).fit_transform(deepcopy(X))
 				for (x, y), deck in zip(xy, decks):
 					deck["x"] = float(x)
@@ -370,26 +439,29 @@ class ClusterSet:
 			decks_in_cluster = defaultdict(list)
 			for deck, cluster_id in zip(decks, clusterizer.labels_):
 				decks_in_cluster[int(cluster_id)].append(deck)
-			initial_clusters = [Cluster(id, decks) for id, decks in decks_in_cluster.items()]
 
+			clusters = [Cluster(id, decks) for id, decks in decks_in_cluster.items()]
 			next_cluster_id = max(decks_in_cluster.keys()) + 1
-			final_clusters = []
-			for cluster in initial_clusters:
-				for rule in FALSE_POSITIVE_RULES:
+			next_clusters = []
+			for rule in FALSE_POSITIVE_RULES:
+				for cluster in clusters:
+
 					# If any decks match the rule than split the cluster
-					if any(rule(d) for d in cluster.decks):
-						matches= Cluster(next_cluster_id, [d for d in decks if rule(d)])
+					if any(rule(d) for d in cluster.decks) and not all(rule(d) for d in cluster.decks):
+						matches = Cluster(next_cluster_id, [d for d in cluster.decks if rule(d)])
 						matches.rules.append(rule)
-						final_clusters.append(matches)
+						next_clusters.append(matches)
 						next_cluster_id += 1
 
-						misses = Cluster(next_cluster_id, [d for d in decks if not rule(d)])
-						final_clusters.append(misses)
+						misses = Cluster(next_cluster_id, [d for d in cluster.decks if not rule(d)])
+						next_clusters.append(misses)
 						next_cluster_id += 1
 					else:
-						final_clusters.append(cluster)
+						next_clusters.append(cluster)
+				clusters = next_clusters
+				next_clusters = []
 
-			class_cluster = ClassClusters(player_class, final_clusters)
+			class_cluster = ClassClusters(player_class, clusters)
 
 			if consolidate:
 				class_cluster.consolidate_clusters()
@@ -400,7 +472,7 @@ class ClusterSet:
 				for cluster in class_cluster.clusters:
 					# check single_deck_max to make sure there will be at least one deck
 					# eligible for global stats
-					if cluster.observations >= 1000 and cluster.single_deck_max_observations >= 1000:
+					if cluster.observations >= 1000: # and cluster.single_deck_max_observations >= 1000:
 						final_clusters.append(cluster)
 					else:
 						misc_cluster_decks.extend(cluster.decks)
