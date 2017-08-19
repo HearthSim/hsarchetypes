@@ -486,8 +486,9 @@ class ClusterSet:
 					else:
 						misc_cluster_decks.extend(cluster.decks)
 
-				misc_cluster = Cluster(-1, misc_cluster_decks )
-				final_clusters.append(misc_cluster)
+				if len(misc_cluster_decks):
+					misc_cluster = Cluster(-1, misc_cluster_decks)
+					final_clusters.append(misc_cluster)
 
 				class_cluster = ClassClusters(player_class, final_clusters)
 				class_cluster.update_cluster_signatures()
