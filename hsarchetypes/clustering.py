@@ -469,6 +469,7 @@ class ClusterSet:
 				next_clusters = []
 
 			class_cluster = ClassClusters(player_class, clusters)
+			class_cluster.update_cluster_signatures()
 
 			if consolidate:
 				print("\n\n****** Consolidating: %s ******" % player_class)
@@ -489,6 +490,7 @@ class ClusterSet:
 				final_clusters.append(misc_cluster)
 
 				class_cluster = ClassClusters(player_class, final_clusters)
+				class_cluster.update_cluster_signatures()
 
 			class_clusters.append(class_cluster)
 
@@ -509,9 +511,11 @@ class ClusterSet:
 		for player_class, clusters in self.items():
 			player_class_result = {
 				"player_class": player_class,
-				"data": []
+				"data": [],
+				"signatures": {}
 			}
 			for cluster in clusters:
+				player_class_result["signatures"][cluster.cluster_id] = cluster.signature
 				for deck in cluster.decks:
 					metadata = {
 						"games": int(deck["observations"]),
