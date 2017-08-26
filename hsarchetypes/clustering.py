@@ -2,19 +2,22 @@ from collections import defaultdict
 from copy import deepcopy
 from itertools import combinations
 import numpy as np
-from hearthstone.enums import GameTag
+from hearthstone.enums import GameTag, Race, CardType
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from .signatures import calculate_signature_weights
 from .utils import card_db, dbf_id_vector
 
 
-NUM_CLUSTERS = 10
+NUM_CLUSTERS = 20
 LOW_VOLUME_CLUSTER_MULTIPLIER = 1.5
-INHERITENCE_THRESHOLD = .75
+INHERITENCE_THRESHOLD = .85
 SMALL_CLUSTER_CUTOFF = 1500
-SIMILARITY_THRESHOLD_FLOOR = .25
+SIMILARITY_THRESHOLD_FLOOR = .85
 
+USE_CCP_FOR_SIGNATURE = False
+USE_CCP_FOR_MERGING = False
+USE_THRESHOLDS = False
 
 db = card_db()
 
@@ -79,7 +82,8 @@ def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
 	mean = np.mean(wr, axis=0)
 	std = np.std(wr, axis=0)
 
-	similarity_threshold = max(SIMILARITY_THRESHOLD_FLOOR, mean + (std * 1.8))
+	similarity_threshold = SIMILARITY_THRESHOLD_FLOOR
+	# similarity_threshold = max(SIMILARITY_THRESHOLD_FLOOR, mean + (std * 1.8))
 	# similarity_threshold is how similar two clusters must be to be eligible to be merged
 	# As this value gets larger, we will be less aggressive about merging clusters
 	msg = "\nsimilarity threshold: %s, mean:%s, std:%s\n"
@@ -145,8 +149,13 @@ class Cluster:
 		self.name = name
 		self.external_id = external_id
 		self.rules = []
+		self._augment_decks()
+
+	def _augment_decks(self):
 		for deck in self.decks:
-			deck["cluster_id"] = cluster_id
+			deck["cluster_id"] = self.cluster_id
+			deck["archetype_name"] = self.name
+			deck["external_id"] = self.external_id
 
 	def __str__(self):
 		c_id = None
@@ -158,7 +167,11 @@ class Cluster:
 			c_id = self.external_id
 
 		template = "Cluster %s - %i decks (%i games) - %s"
-		return template % (str(c_id), len(self.decks), self.observations, self.most_popular_deck["decklist"])
+		pretty_sig = []
+		for dbf, w in sorted(self.signature.items(), key=lambda t: t[1], reverse=True):
+			card = db[int(dbf)]
+			pretty_sig.append("%s:%s" % (card.name, round(w, 2)))
+		return template % (str(c_id), len(self.decks), self.observations, ", ".join(pretty_sig))
 
 	def __repr__(self):
 		return str(self)
@@ -196,6 +209,7 @@ class Cluster:
 	def inherit_from_previous(self, previous_class_cluster):
 		self.name = previous_class_cluster.name
 		self.external_id = previous_class_cluster.external_id
+		self._augment_decks()
 
 	def pretty_signature_string(self, sep=", "):
 		db = card_db()
@@ -239,18 +253,23 @@ class ClassClusters:
 				current_cluster.inherit_from_previous(best_match_cluster)
 				consumed_external_cluster_ids.add(best_match_cluster.external_id)
 
-	def update_cluster_signatures(self):
-		signature_weights = calculate_signature_weights(self)
+	def update_cluster_signatures(self, use_ccp):
+		signature_weights = calculate_signature_weights(
+			self,
+			use_ccp=use_ccp,
+			use_thresholds=USE_THRESHOLDS
+		)
+
 		for cluster in self.clusters:
 			cluster.signature = signature_weights[cluster.cluster_id]
 
 	def consolidate_clusters(self, distance_function=cluster_similarity):
 		consolidation_successful = True
-		self.update_cluster_signatures()
+		self.update_cluster_signatures(use_ccp=USE_CCP_FOR_MERGING)
 		similarity_threshold = _analyze_cluster_space(self.clusters, distance_function)
 		while consolidation_successful and len(self.clusters) > 1:
 			consolidation_successful = self._attempt_consolidation(similarity_threshold, distance_function)
-			self.update_cluster_signatures()
+			self.update_cluster_signatures(use_ccp=USE_CCP_FOR_MERGING)
 
 	def _attempt_consolidation(self, similarity_threshold, distance_function=cluster_similarity):
 		new_clusters = _do_merge_clusters(self.clusters, distance_function, similarity_threshold)
@@ -287,6 +306,70 @@ def to_mana_curve_vector(deck):
 	return [float(num_cards_by_cost[c]) / num_cards for c in range(0, 11)]
 
 
+mechanics = [
+	GameTag.ADAPT,
+	GameTag.BATTLECRY,
+	GameTag.CHARGE,
+	GameTag.CHOOSE_ONE,
+	GameTag.COMBO,
+	GameTag.DEATHRATTLE,
+	GameTag.DISCOVER,
+	GameTag.DIVINE_SHIELD,
+	GameTag.ENRAGED,
+	GameTag.FORGETFUL,
+	GameTag.FREEZE,
+	GameTag.GRIMY_GOONS,
+	GameTag.INSPIRE,
+	GameTag.JADE_LOTUS,
+	GameTag.KABAL,
+	GameTag.LIFESTEAL,
+	GameTag.OVERLOAD,
+	GameTag.POISONOUS,
+	GameTag.RITUAL,
+	GameTag.SECRET,
+	GameTag.SPELLPOWER,
+	GameTag.SILENCE,
+	GameTag.TAUNT,
+	GameTag.WINDFURY,
+]
+
+# Need to find cards that generate spare parts
+
+
+def to_mechanic_vector(deck):
+	num_cards = float(sum(deck["cards"].values()))
+	mechanics_count = []
+	for mechanic in mechanics:
+		num_occurs = float(0)
+		for dbf_id, count in deck["cards"].items():
+			card = db[int(dbf_id)]
+			if card.tags.get(mechanic, 0):
+				num_occurs += float(count)
+		mechanics_count.append(num_occurs / num_cards)
+
+	return mechanics_count
+
+
+def to_card_type_vector(deck):
+	num_cards = float(sum(deck["cards"].values()))
+	card_type_count = defaultdict(int)
+	for dbf_id, count in deck["cards"].items():
+		card = db[int(dbf_id)]
+		card_type_count[card.type] += count
+
+	return [float(card_type_count[t]) / num_cards for t in CardType]
+
+
+def to_tribe_vector(deck):
+	num_cards = float(sum(deck["cards"].values()))
+	tribe_count = defaultdict(int)
+	for dbf_id, count in deck["cards"].items():
+		card = db[int(dbf_id)]
+		tribe_count[card.race] += count
+
+	return [float(tribe_count[r]) / num_cards for r in Race]
+
+
 class ClusterSet:
 	"""A collection of ClassClusters."""
 
@@ -313,56 +396,18 @@ class ClusterSet:
 		consolidate=True,
 		create_experimental_cluster=True,
 		use_mana_curve=True,
-		use_tribes=False,
-		use_card_types=False,
-		use_mechanics=False,
+		use_tribes=True,
+		use_card_types=True,
+		use_mechanics=True,
 	):
-		"""
-		Expected input_data format:
-
-		{
-			"DRUID": [
-				...
-			],
-			"PALADIN": [
-				{
-					"observations": 265,
-					"decklist": "[Acherus Veteran x 2, Argent Squire x 2, ...],
-					"deck_id": 326974234,
-					"url": "https://hsreplay.net/decks/xkWJYJTH6KWTdwwpQucxsg",
-					"cards": {
-						"45392": 1,
-						"42467": 2,
-						"41139": 2,
-						"38745": 2,
-						"41145": 1,
-						"757": 2,
-						"42773": 2,
-						"41864": 1,
-						"679": 2,
-						"40465": 1,
-						"38740": 2,
-						"42462": 2,
-						"847": 2,
-						"1022": 2,
-						"943": 2,
-						"878": 2,
-						"42469": 2
-					},
-					"win_rate": 50.42,
-					"avg_num_turns": 17.0
-				},
-				{
-					...
-				}
-			],
-		}
-		"""
 		data = deepcopy(input_data)
 		base_vector = dbf_id_vector()
 
 		class_clusters = []
 		for player_class, decks in data.items():
+			# if player_class not in ("WARLOCK", "PALADIN"):
+			# 	continue
+
 			X = []
 			for deck in decks:
 				cards = deck["cards"]
@@ -377,24 +422,26 @@ class ClusterSet:
 					vector.extend(mana_curve_vector)
 
 				if use_tribes:
-					vector.extend([])
+					# Murloc, Dragon, Pirate, etc.
+					tribe_vector = to_tribe_vector(deck)
+					vector.extend(tribe_vector)
 
 				if use_card_types:
 					# Weapon, Spell, Minion, Hero, Secret
-					# vector.extend([])
-					pass
+					card_type_vector = to_card_type_vector(deck)
+					vector.extend(card_type_vector)
 
 				if use_mechanics:
 					# Secret, Deathrattle, Battlecry, Lifesteal,
-					# vector.extend([])
-					pass
+					mechanic_vector = to_mechanic_vector(deck)
+					vector.extend(mechanic_vector)
 
 				X.append(vector)
 
 			if len(decks) > 1:
 				from sklearn import manifold
 				tsne = manifold.TSNE(n_components=2, init='pca', random_state=0)
-				xy = tsne.fit_transform(X)
+				xy = tsne.fit_transform(deepcopy(X))
 				for (x, y), deck in zip(xy, decks):
 					deck["x"] = float(x)
 					deck["y"] = float(y)
@@ -440,7 +487,7 @@ class ClusterSet:
 				next_clusters = []
 
 			class_cluster = ClassClusters(player_class, clusters)
-			class_cluster.update_cluster_signatures()
+			class_cluster.update_cluster_signatures(use_ccp=USE_CCP_FOR_SIGNATURE)
 
 			if consolidate:
 				print("\n\n****** Consolidating: %s ******" % player_class)
@@ -462,7 +509,7 @@ class ClusterSet:
 					final_clusters.append(experimental_cluster)
 
 				class_cluster = ClassClusters(player_class, final_clusters)
-				class_cluster.update_cluster_signatures()
+				class_cluster.update_cluster_signatures(use_ccp=USE_CCP_FOR_SIGNATURE)
 
 			class_clusters.append(class_cluster)
 
@@ -492,7 +539,7 @@ class ClusterSet:
 				for deck in cluster.decks:
 					metadata = {
 						"games": int(deck["observations"]),
-						"archetype_name": str(deck["cluster_id"]),
+						"archetype_name": str(deck["archetype_name"] or deck["cluster_id"]),
 						"archetype": int(deck["cluster_id"]),
 						"win_rate": deck["win_rate"],
 						"shortid": deck.get("shortid", None),

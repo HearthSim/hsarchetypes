@@ -13,29 +13,38 @@ default_thresholds = {
 }
 
 
-def calculate_signature_weights(cluster_data, thresholds=default_thresholds):
+def calculate_signature_weights(
+	cluster_data,
+	thresholds=default_thresholds,
+	use_ccp=True,
+	use_thresholds=True
+):
 	# For each archetype generate new signatures.
 	raw_new_weights = {}
 	for cluster_id, cluster_decks in cluster_data.items():
 		raw_new_weights[cluster_id] = calculate_signature_weights_for_cluster(
 			cluster_decks,
-			thresholds
+			thresholds,
+			use_thresholds
 		)
 
-	final_new_weights = {}
+	if use_ccp:
+		final_new_weights = {}
 
-	# Then apply the cross-cluster-prevalence scaling
-	for cluster_id, weights in raw_new_weights.items():
-		weights_copy = copy(raw_new_weights)
-		del weights_copy[cluster_id]
-		final_new_weights[cluster_id] = apply_cross_cluster_prevalence(
-			weights,
-			weights_copy
-		)
-	return final_new_weights
+		# Then apply the cross-cluster-prevalence scaling
+		for cluster_id, weights in raw_new_weights.items():
+			weights_copy = copy(raw_new_weights)
+			del weights_copy[cluster_id]
+			final_new_weights[cluster_id] = apply_cross_cluster_prevalence(
+				weights,
+				weights_copy
+			)
+		return final_new_weights
+	else:
+		return raw_new_weights
 
 
-def calculate_signature_weights_for_cluster(decks, thresholds):
+def calculate_signature_weights_for_cluster(decks, thresholds, use_thresholds=True):
 	prevalence_counts = {}
 	deck_occurrences = 0
 
@@ -51,20 +60,23 @@ def calculate_signature_weights_for_cluster(decks, thresholds):
 		# Could not find any matching deck, break early
 		return []
 
-	return calculate_prevalences(prevalence_counts, deck_occurrences, thresholds)
+	return calculate_prevalences(prevalence_counts, deck_occurrences, thresholds, use_thresholds)
 
 
-def calculate_prevalences(prevalence_counts, deck_occurrences, thresholds):
+def calculate_prevalences(prevalence_counts, deck_occurrences, thresholds, use_thresholds=True):
 	ret = {}
 
 	for dbf_id, observation_count in prevalence_counts.items():
 		prevalence = float(observation_count) / float(deck_occurrences)
 
-		for threshold in sorted(thresholds.keys(), reverse=True):
-			if prevalence >= threshold:
-				weight = float(thresholds[threshold]) * prevalence
-				ret[dbf_id] = weight
-				break
+		if use_thresholds:
+			for threshold in sorted(thresholds.keys(), reverse=True):
+				if prevalence >= threshold:
+					weight = float(thresholds[threshold]) * prevalence
+					ret[dbf_id] = weight
+					break
+		else:
+			ret[dbf_id] = prevalence
 
 	return ret
 
