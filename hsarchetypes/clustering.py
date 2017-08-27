@@ -553,6 +553,7 @@ class ClusterSet:
 						"archetype": int(deck["cluster_id"]),
 						"win_rate": deck["win_rate"],
 						"shortid": deck.get("shortid", None),
+						"deck_list": deck.get("card_list", None),
 					}
 					player_class_result["data"].append({
 						"x": deck["x"],
