@@ -119,7 +119,7 @@ def test_clustering_aug12_to_aug19_standard():
 	assert_at_least_N_clusters_contain(1, rogue_clusters, BLAZECALLER) # Elemental Rogue
 	assert_at_least_N_clusters_contain(1, rogue_clusters, JADE_SWARMER) # Jade Rogue
 	assert_at_least_N_clusters_contain(1, rogue_clusters, SOUTHSEA_CAPTAIN)  # Pirate Rogue
-	assert len(rogue_clusters) == 7
+	assert len(rogue_clusters) >= 7
 
 	# Shaman 3 + Experimental
 	DOPPLEGANGSTER = 40953

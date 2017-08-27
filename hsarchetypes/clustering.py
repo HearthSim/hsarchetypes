@@ -142,13 +142,13 @@ def _most_similar_pair(clusters, distance_function):
 class Cluster:
 	"""A cluster is defined by a collection of decks and a signature of card weights."""
 
-	def __init__(self, cluster_id, decks, signature=None, name=None, external_id=None):
+	def __init__(self, cluster_id, decks, signature=None, name=None, external_id=None, rules=None):
 		self.cluster_id = cluster_id
 		self.decks = decks or []
 		self.signature = signature
 		self.name = name
 		self.external_id = external_id
-		self.rules = []
+		self.rules = rules or []
 		self._augment_decks()
 
 	def _augment_decks(self):
@@ -194,12 +194,14 @@ class Cluster:
 		return [d["decklist"] for d in sorted_decks[:10]]
 
 	def can_merge(self, other_cluster):
-		for r in self.rules:
+		for rule_name in self.rules:
+			r = FALSE_POSITIVE_RULES[rule_name]
 			for d in other_cluster.decks:
 				if not r(d):
 					return False
 
-		for r in other_cluster.rules:
+		for rule_name in other_cluster.rules:
+			r = FALSE_POSITIVE_RULES[rule_name]
 			for d in self.decks:
 				if not r(d):
 					return False
@@ -217,7 +219,7 @@ class Cluster:
 		for dbf_id, weight in self.signature.items():
 			components[db[int(dbf_id)].name] = weight
 		sorted_components = sorted(components.items(), key=lambda t: t[1], reverse=True)
-		return sep.join(["%s - %s" % (n, str(round(w, 2))) for n, w in sorted_components])
+		return sep.join(["%s:%s" % (n, str(round(w, 2))) for n, w in sorted_components])
 
 
 class ClassClusters:
@@ -241,17 +243,18 @@ class ClassClusters:
 	def inherit_from_previous(self, previous_class_cluster):
 		consumed_external_cluster_ids = set()
 		for current_cluster in self.clusters:
-			best_match_score = 0.0
-			best_match_cluster = None
-			for previous_cluster in previous_class_cluster.clusters:
-				if previous_cluster.external_id not in consumed_external_cluster_ids:
-					similarity = cluster_similarity(previous_cluster, current_cluster)
-					if similarity >= INHERITENCE_THRESHOLD and similarity > best_match_score:
-						best_match_score = similarity
-						best_match_cluster = previous_cluster
-			if best_match_cluster:
-				current_cluster.inherit_from_previous(best_match_cluster)
-				consumed_external_cluster_ids.add(best_match_cluster.external_id)
+			if current_cluster.cluster_id != -1:
+				best_match_score = 0.0
+				best_match_cluster = None
+				for previous_cluster in previous_class_cluster.clusters:
+					if previous_cluster.external_id not in consumed_external_cluster_ids:
+						similarity = cluster_similarity(previous_cluster, current_cluster)
+						if similarity >= INHERITENCE_THRESHOLD and similarity > best_match_score:
+							best_match_score = similarity
+							best_match_cluster = previous_cluster
+				if best_match_cluster:
+					current_cluster.inherit_from_previous(best_match_cluster)
+					consumed_external_cluster_ids.add(best_match_cluster.external_id)
 
 	def update_cluster_signatures(self, use_ccp):
 		signature_weights = calculate_signature_weights(
@@ -290,10 +293,17 @@ def is_quest_deck(deck):
 	return False
 
 
-FALSE_POSITIVE_RULES = [
-	is_highlander_deck,
-	is_quest_deck,
-]
+# FALSE_POSITIVE_RULES = [
+# 	is_highlander_deck,
+# 	is_quest_deck,
+# ]
+
+
+FALSE_POSITIVE_RULES = {
+	"is_highlander_deck": is_highlander_deck,
+	"is_quest_deck": is_quest_deck
+}
+
 
 
 def to_mana_curve_vector(deck):
@@ -413,7 +423,7 @@ class ClusterSet:
 				cards = deck["cards"]
 				vector = [float(cards.get(str(dbf_id), 0)) / 2.0 for dbf_id in base_vector]
 
-				for rule in FALSE_POSITIVE_RULES:
+				for rule_name, rule in FALSE_POSITIVE_RULES.items():
 					rule_outcome = rule(deck)
 					vector.append(float(rule_outcome))
 
@@ -464,14 +474,14 @@ class ClusterSet:
 			clusters = [Cluster(id, decks) for id, decks in decks_in_cluster.items()]
 			next_cluster_id = max(decks_in_cluster.keys()) + 1
 			next_clusters = []
-			for rule in FALSE_POSITIVE_RULES:
+			for rule_name, rule in FALSE_POSITIVE_RULES.items():
 				for cluster in clusters:
 
 					# If any decks match the rule than split the cluster
 					if any(rule(d) for d in cluster.decks):
 						matches = Cluster(next_cluster_id, [d for d in cluster.decks if rule(d)])
 						matches.rules.extend(cluster.rules)
-						matches.rules.append(rule)
+						matches.rules.append(rule_name)
 						next_clusters.append(matches)
 						next_cluster_id += 1
 
@@ -543,7 +553,6 @@ class ClusterSet:
 						"archetype": int(deck["cluster_id"]),
 						"win_rate": deck["win_rate"],
 						"shortid": deck.get("shortid", None),
-						"deck_list": deck.get("card_list", None),
 					}
 					player_class_result["data"].append({
 						"x": deck["x"],
