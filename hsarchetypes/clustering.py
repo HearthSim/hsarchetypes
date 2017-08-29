@@ -541,12 +541,14 @@ class ClusterSet:
 			player_class_result = {
 				"player_class": player_class,
 				"data": [],
-				"signatures": {}
+				"signatures": {},
+				"archetype_map": {}
 			}
-			for cluster in clusters:
-				sig = [[int(dbf), weight] for dbf, weight in cluster.signature.items()]
-				player_class_result["signatures"][cluster.cluster_id] = sig
-				for deck in cluster.decks:
+			for c in clusters:
+				sig = [[int(dbf), weight] for dbf, weight in c.signature.items()]
+				player_class_result["signatures"][c.cluster_id] = sig
+				player_class_result["archetype_map"][c.cluster_id] = c.external_id
+				for deck in c.decks:
 					metadata = {
 						"games": int(deck["observations"]),
 						"archetype_name": str(deck["archetype_name"] or deck["cluster_id"]),
