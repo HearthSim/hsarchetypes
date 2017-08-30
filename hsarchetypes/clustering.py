@@ -107,13 +107,7 @@ def _do_merge_clusters(clusters, distance_function, minimum_simularity):
 		print("They Will Be Merged")
 
 	c1, c2, sim_score = most_similar
-	new_cluster_decks = []
-	new_cluster_decks.extend(c1.decks)
-	new_cluster_decks.extend(c2.decks)
-	new_cluster = Cluster(
-		next_cluster_id,
-		new_cluster_decks,
-	)
+	new_cluster = merge_clusters(next_cluster_id, [c1, c2])
 	next_clusters_list = [new_cluster]
 	for c in current_clusters:
 		if c.cluster_id not in (c1.cluster_id, c2.cluster_id):
@@ -138,6 +132,40 @@ def _most_similar_pair(clusters, distance_function):
 	else:
 		return None
 
+
+def merge_clusters(new_cluster_id, clusters):
+	new_cluster_decks = []
+	new_cluster_rules = []
+	external_id = None
+	name = None
+	for cluster in clusters:
+		new_cluster_decks.extend(cluster.decks)
+		new_cluster_rules.extend(cluster.rules)
+		if cluster.external_id:
+			if not external_id or external_id == cluster.external_id:
+				external_id = cluster.external_id
+				name = cluster.name
+			else:
+				msg = "Cannot merge clusters with different external IDs: (%s, %s)"
+				raise RuntimeError(
+					msg % (external_id, cluster.external_id)
+				)
+
+	for rule_name in new_cluster_rules:
+		rule = FALSE_POSITIVE_RULES[rule_name]
+		if not all(rule(d) for d in new_cluster_decks):
+			msg = "Not all decks in clusters to be merged pass rule: %s"
+			raise RuntimeError(
+				msg % (rule_name)
+			)
+
+	return Cluster(
+		cluster_id=new_cluster_id,
+		decks=new_cluster_decks,
+		external_id=external_id,
+		name=name,
+		rules=new_cluster_rules,
+	)
 
 class Cluster:
 	"""A cluster is defined by a collection of decks and a signature of card weights."""
@@ -542,17 +570,20 @@ class ClusterSet:
 				"player_class": player_class,
 				"data": [],
 				"signatures": {},
-				"archetype_map": {}
+				"cluster_map": {},
+				"cluster_names": {}
 			}
 			for c in clusters:
 				sig = [[int(dbf), weight] for dbf, weight in c.signature.items()]
 				player_class_result["signatures"][c.cluster_id] = sig
-				player_class_result["archetype_map"][c.cluster_id] = c.external_id
+				player_class_result["cluster_map"][c.cluster_id] = c.external_id
 				for deck in c.decks:
+					cur_arch_name = str(deck["archetype_name"] or deck["cluster_id"])
+					player_class_result["cluster_names"][c.cluster_id] = cur_arch_name
 					metadata = {
 						"games": int(deck["observations"]),
-						"archetype_name": str(deck["archetype_name"] or deck["cluster_id"]),
-						"archetype": int(deck["cluster_id"]),
+						"cluster_name": cur_arch_name,
+						"cluster_id": int(deck["cluster_id"]),
 						"win_rate": deck["win_rate"],
 						"shortid": deck.get("shortid", None),
 						"deck_list": deck.get("card_list", None),
