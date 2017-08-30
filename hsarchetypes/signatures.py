@@ -44,7 +44,7 @@ def calculate_signature_weights(
 		return raw_new_weights
 
 
-def calculate_signature_weights_for_cluster(decks, thresholds, use_thresholds=True):
+def calculate_signature_weights_for_cluster(decks, thresholds=default_thresholds, use_thresholds=True):
 	prevalence_counts = {}
 	deck_occurrences = 0
 
