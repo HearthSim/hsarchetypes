@@ -1,7 +1,7 @@
 import json
 import os
 from .conftest import CLUSTERING_DATA
-from hsarchetypes.clustering import ClusterSet
+from hsarchetypes.clustering import create_cluster_set
 from hsarchetypes.utils import card_db
 
 
@@ -32,7 +32,7 @@ def test_clustering_aug12_to_aug19_standard():
 	)
 	data = json.load(open(data_path, "r"))
 
-	cluster_set = ClusterSet.create_cluster_set(data)
+	cluster_set = create_cluster_set(data)
 
 	# Druid 4 + Experimental
 	JADE_IDOL = 40372
@@ -119,7 +119,7 @@ def test_clustering_aug12_to_aug19_standard():
 	assert_at_least_N_clusters_contain(1, rogue_clusters, BLAZECALLER) # Elemental Rogue
 	assert_at_least_N_clusters_contain(1, rogue_clusters, JADE_SWARMER) # Jade Rogue
 	assert_at_least_N_clusters_contain(1, rogue_clusters, SOUTHSEA_CAPTAIN)  # Pirate Rogue
-	assert len(rogue_clusters) >= 7
+	assert len(rogue_clusters) >= 6
 
 	# Shaman 3 + Experimental
 	DOPPLEGANGSTER = 40953
