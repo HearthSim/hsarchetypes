@@ -29,11 +29,12 @@ def calculate_signature_weights(
 		)
 
 	if use_ccp:
+		ccp_input_weights = generate_ccp_input_weights(raw_new_weights)
 		final_new_weights = {}
 
 		# Then apply the cross-cluster-prevalence scaling
-		for cluster_id, weights in raw_new_weights.items():
-			weights_copy = copy(raw_new_weights)
+		for cluster_id, weights in ccp_input_weights.items():
+			weights_copy = copy(ccp_input_weights)
 			del weights_copy[cluster_id]
 			final_new_weights[cluster_id] = apply_cross_cluster_prevalence(
 				weights,
@@ -42,6 +43,17 @@ def calculate_signature_weights(
 		return final_new_weights
 	else:
 		return raw_new_weights
+
+
+def generate_ccp_input_weights(input_weights, cutoff=.5):
+	result = {}
+	for cluster_id, weights in input_weights.items():
+		if cluster_id not in result:
+			result[cluster_id] = {}
+		for dbf_id, weight in weights.items():
+			if weight >= cutoff:
+				result[cluster_id][dbf_id] = weight
+	return result
 
 
 def calculate_signature_weights_for_cluster(decks, thresholds=default_thresholds, use_thresholds=True):
