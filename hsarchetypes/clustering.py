@@ -242,7 +242,7 @@ class Cluster:
 		for dbf_id, weight in self.signature.items():
 			components[db[int(dbf_id)].name] = weight
 		sorted_components = sorted(components.items(), key=lambda t: t[1], reverse=True)
-		return sep.join(["%s:%s" % (n, str(round(w, 2))) for n, w in sorted_components])
+		return sep.join(["%s:%s" % (n, str(round(w, 4))) for n, w in sorted_components])
 
 
 class ClassClusters:
