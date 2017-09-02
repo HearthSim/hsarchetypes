@@ -21,7 +21,7 @@ def calculate_signature_weights(
 ):
 	# For each archetype generate new signatures.
 	raw_new_weights = {}
-	for cluster_id, cluster_decks in cluster_data.items():
+	for cluster_id, cluster_decks in cluster_data:
 		raw_new_weights[cluster_id] = calculate_signature_weights_for_cluster(
 			cluster_decks,
 			thresholds,

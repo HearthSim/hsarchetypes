@@ -13,8 +13,7 @@ INHERITENCE_THRESHOLD = .85
 SMALL_CLUSTER_CUTOFF = 1500
 SIMILARITY_THRESHOLD_FLOOR = .85
 
-USE_CCP_FOR_SIGNATURE = False
-USE_CCP_FOR_MERGING = False
+
 USE_THRESHOLDS = False
 
 db = card_db()
@@ -290,32 +289,32 @@ class ClassClusters:
 					current_cluster.inherit_from_previous(best_match_cluster)
 					consumed_external_cluster_ids.add(best_match_cluster.external_id)
 
-	def update_cluster_signatures(self, use_ccp):
+	def update_cluster_signatures(self):
 		signature_weights = calculate_signature_weights(
-			self,
+			[(c.cluster_id, c.data_points) for c in self.clusters],
 			use_ccp=False,
 			use_thresholds=USE_THRESHOLDS
 		)
 
 		for cluster in self.clusters:
-			cluster.signature = signature_weights[cluster.cluster_id]
+			cluster.signature = signature_weights.get(cluster.cluster_id, {})
 
 		ccp_signature_weights = calculate_signature_weights(
-			self,
+			[(c.cluster_id, c.data_points) for c in self.clusters if c.external_id],
 			use_ccp=True,
 			use_thresholds=USE_THRESHOLDS
 		)
 
 		for cluster in self.clusters:
-			cluster.ccp_signature = ccp_signature_weights[cluster.cluster_id]
+			cluster.ccp_signature = ccp_signature_weights.get(cluster.cluster_id, {})
 
 	def consolidate_clusters(self, distance_function=cluster_similarity):
 		consolidation_successful = True
-		self.update_cluster_signatures(use_ccp=USE_CCP_FOR_MERGING)
+		self.update_cluster_signatures()
 		similarity_threshold = SIMILARITY_THRESHOLD_FLOOR
 		while consolidation_successful and len(self.clusters) > 1:
 			consolidation_successful = self._attempt_consolidation(similarity_threshold, distance_function)
-			self.update_cluster_signatures(use_ccp=USE_CCP_FOR_MERGING)
+			self.update_cluster_signatures()
 
 	def _attempt_consolidation(self, similarity_threshold, distance_function=cluster_similarity):
 		new_clusters = _do_merge_clusters(
@@ -359,6 +358,7 @@ class ClusterSet:
 				for current_cc in self.class_clusters:
 					if current_cc.player_class == previous_cc.player_class:
 						current_cc.inherit_from_previous(previous_cc)
+						current_cc.update_cluster_signatures()
 
 	def items(self):
 		for class_cluster in self.class_clusters:
@@ -501,7 +501,8 @@ def create_cluster_set(
 						data_point_matches
 					)
 					matches.rules.extend(cluster.rules)
-					matches.rules.append(rule_name)
+					if rule_name not in matches.rules:
+						matches.rules.append(rule_name)
 					next_clusters.append(matches)
 					next_cluster_id += 1
 
@@ -527,7 +528,7 @@ def create_cluster_set(
 			int(CardClass[player_class]),
 			clusters
 		)
-		class_cluster.update_cluster_signatures(use_ccp=USE_CCP_FOR_SIGNATURE)
+		class_cluster.update_cluster_signatures()
 
 		if consolidate:
 			print("\n\n****** Consolidating: %s ******" % player_class)
@@ -559,7 +560,7 @@ def create_cluster_set(
 				int(CardClass[player_class]),
 				final_clusters
 			)
-			class_cluster.update_cluster_signatures(use_ccp=USE_CCP_FOR_SIGNATURE)
+			class_cluster.update_cluster_signatures()
 
 		class_clusters.append(class_cluster)
 
