@@ -313,10 +313,14 @@ class ClassClusters:
 		for cluster in self.clusters:
 			cluster.ccp_signature = ccp_signature_weights.get(cluster.cluster_id, {})
 
-	def consolidate_clusters(self, distance_function=cluster_similarity):
+	def consolidate_clusters(
+		self,
+		merge_similarity=SIMILARITY_THRESHOLD_FLOOR,
+		distance_function=cluster_similarity
+	):
 		consolidation_successful = True
 		self.update_cluster_signatures()
-		similarity_threshold = SIMILARITY_THRESHOLD_FLOOR
+		similarity_threshold = merge_similarity
 		while consolidation_successful and len(self.clusters) > 1:
 			consolidation_successful = self._attempt_consolidation(similarity_threshold, distance_function)
 			self.update_cluster_signatures()
@@ -413,6 +417,8 @@ class ClusterSet:
 def create_cluster_set(
 	input_data,
 	factory=ClusterSet,
+	num_clusters=NUM_CLUSTERS,
+	merge_similarity=SIMILARITY_THRESHOLD_FLOOR,
 	consolidate=True,
 	create_experimental_cluster=True,
 	use_mana_curve=True,
@@ -478,7 +484,7 @@ def create_cluster_set(
 
 
 		X = StandardScaler().fit_transform(X)
-		clusterizer = KMeans(n_clusters=min(int(NUM_CLUSTERS), len(X)))
+		clusterizer = KMeans(n_clusters=min(int(num_clusters), len(X)))
 		clusterizer.fit(X)
 
 		data_points_in_cluster = defaultdict(list)
@@ -537,7 +543,7 @@ def create_cluster_set(
 
 		if consolidate:
 			print("\n\n****** Consolidating: %s ******" % player_class)
-			class_cluster.consolidate_clusters()
+			class_cluster.consolidate_clusters(merge_similarity)
 
 		if create_experimental_cluster:
 			final_clusters = []
