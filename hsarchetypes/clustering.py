@@ -118,10 +118,13 @@ def merge_clusters(cluster_factory, cluster_set, new_cluster_id, clusters):
 	new_cluster_data_points = []
 	new_cluster_rules = []
 	external_id = None
-	name = None
+	name = "NEW"
 	for cluster in clusters:
 		new_cluster_data_points.extend(cluster.data_points)
-		new_cluster_rules.extend(cluster.rules)
+		for rule_name in cluster.rules:
+			if rule_name not in new_cluster_rules:
+				new_cluster_rules.append(rule_name)
+
 		if cluster.external_id:
 			if not external_id or external_id == cluster.external_id:
 				external_id = cluster.external_id
@@ -230,9 +233,9 @@ class Cluster:
 
 		return self_satisfies_other and other_satisfies_self
 
-	def inherit_from_previous(self, previous_class_cluster):
-		self.name = previous_class_cluster.name
-		self.external_id = previous_class_cluster.external_id
+	def inherit_from_previous(self, previous_cluster):
+		self.name = previous_cluster.name
+		self.external_id = previous_cluster.external_id
 		self._augment_data_points()
 
 	def pretty_signature_string(self, sep=", "):
