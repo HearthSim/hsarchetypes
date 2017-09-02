@@ -364,13 +364,14 @@ class ClusterSet:
 		for class_cluster in self.class_clusters:
 			yield (class_cluster.player_class, class_cluster.clusters)
 
-	def to_chart_data(self, with_external_ids=False):
+	def to_chart_data(self, with_external_ids=False, include_ccp_signature=False):
 		result = []
 		for player_class, clusters in self.items():
 			player_class_result = {
 				"player_class": CardClass(int(player_class)).name,
 				"data": [],
 				"signatures": {},
+				"ccp_signatures": {},
 				"cluster_map": {},
 				"cluster_names": {}
 			}
@@ -379,6 +380,9 @@ class ClusterSet:
 					continue
 				sig = [[int(dbf), weight] for dbf, weight in c.signature.items()]
 				player_class_result["signatures"][c.cluster_id] = sig
+				if include_ccp_signature:
+					ccp_sig = [[int(dbf), weight] for dbf, weight in c.ccp_signature.items()]
+					player_class_result["ccp_signatures"][c.cluster_id] = ccp_sig
 				player_class_result["cluster_map"][c.cluster_id] = c.external_id
 				for data_point in c.data_points:
 					cur_arch_name = str(data_point["archetype_name"] or data_point["cluster_id"])
