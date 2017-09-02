@@ -282,12 +282,14 @@ class ClassClusters:
 			if current_cluster.cluster_id != -1:
 				best_match_score = 0.0
 				best_match_cluster = None
-				for previous_cluster in previous_class_cluster.clusters:
-					if previous_cluster.external_id not in consumed_external_cluster_ids:
-						similarity = cluster_similarity(previous_cluster, current_cluster)
+				for previous in previous_class_cluster.clusters:
+					has_external_id = previous.external_id is not None
+					not_consumed = previous.external_id not in consumed_external_cluster_ids
+					if has_external_id and not_consumed:
+						similarity = cluster_similarity(previous, current_cluster)
 						if similarity >= INHERITENCE_THRESHOLD and similarity > best_match_score:
 							best_match_score = similarity
-							best_match_cluster = previous_cluster
+							best_match_cluster = previous
 				if best_match_cluster:
 					current_cluster.inherit_from_previous(best_match_cluster)
 					consumed_external_cluster_ids.add(best_match_cluster.external_id)
