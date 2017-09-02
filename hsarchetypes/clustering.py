@@ -1,9 +1,6 @@
 from copy import deepcopy
 from itertools import combinations
-import numpy as np
 from hearthstone.enums import CardClass
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
 from .features import *
 from .rules import *
 from .signatures import calculate_signature_weights
@@ -58,6 +55,7 @@ def cluster_similarity(c1, c2):
 
 
 def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
+	import numpy as np
 	distances_all = []
 	for c1, c2 in combinations(clusters, 2):
 		sim_score = distance_function(c1, c2)
@@ -413,6 +411,10 @@ def create_cluster_set(
 	use_card_types=True,
 	use_mechanics=True,
 ):
+	from sklearn import manifold
+	from sklearn.cluster import KMeans
+	from sklearn.preprocessing import StandardScaler
+
 	self = factory()
 	self._factory = factory
 
@@ -452,7 +454,6 @@ def create_cluster_set(
 			X.append(vector)
 
 		if len(data_points) > 1:
-			from sklearn import manifold
 			tsne = manifold.TSNE(n_components=2, init='pca', random_state=0)
 			xy = tsne.fit_transform(deepcopy(X))
 			for (x, y), data_point in zip(xy, data_points):
@@ -465,6 +466,7 @@ def create_cluster_set(
 		else:
 			# No data points for this class so don't include it
 			continue
+
 
 		X = StandardScaler().fit_transform(X)
 		clusterizer = KMeans(n_clusters=min(int(NUM_CLUSTERS), len(X)))
