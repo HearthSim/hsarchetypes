@@ -230,8 +230,8 @@ class Cluster:
 	def can_merge(self, other_cluster):
 		other_satisfies_self = self.satisfies_rules(other_cluster.rules)
 		self_satisfies_other = other_cluster.satisfies_rules(self.rules)
-
-		return self_satisfies_other and other_satisfies_self
+		no_external_id_conflict = self.external_id == other_cluster.external_id
+		return self_satisfies_other and other_satisfies_self and no_external_id_conflict
 
 	def inherit_from_previous(self, previous_cluster):
 		self.name = previous_cluster.name
@@ -276,23 +276,49 @@ class ClassClusters:
 		for cluster in self.clusters:
 			yield (cluster.cluster_id, cluster.data_points)
 
-	def inherit_from_previous(self, previous_class_cluster):
+	def create_experimental_cluster(self, experimental_cluster_threshold):
+		final_clusters = []
+		experimental_cluster_data_points = []
+		for cluster in self.clusters:
+			if cluster.observations >= experimental_cluster_threshold:
+				final_clusters.append(cluster)
+			else:
+				experimental_cluster_data_points.extend(cluster.data_points)
+
+		if len(experimental_cluster_data_points):
+			experimental_cluster = Cluster.create(
+				self._cluster_set.CLUSTER_FACTORY,
+				self._cluster_set,
+				-1,
+				experimental_cluster_data_points
+			)
+			final_clusters.append(experimental_cluster)
+		self.clusters = final_clusters
+		self.update_cluster_signatures()
+
+	def inherit_from_previous(self, previous_cc, merge_threshold):
 		consumed_external_cluster_ids = set()
+		available_external_ids = set()
+
+		for c in previous_cc.clusters:
+			if c.external_id and c.external_id != -1:
+				available_external_ids.add(c.external_id)
+
 		for current_cluster in self.clusters:
-			if current_cluster.cluster_id != -1:
-				best_match_score = 0.0
-				best_match_cluster = None
-				for previous in previous_class_cluster.clusters:
-					has_external_id = previous.external_id is not None
-					not_consumed = previous.external_id not in consumed_external_cluster_ids
-					if has_external_id and not_consumed:
-						similarity = cluster_similarity(previous, current_cluster)
-						if similarity >= INHERITENCE_THRESHOLD and similarity > best_match_score:
-							best_match_score = similarity
-							best_match_cluster = previous
-				if best_match_cluster:
-					current_cluster.inherit_from_previous(best_match_cluster)
-					consumed_external_cluster_ids.add(best_match_cluster.external_id)
+			best_match_score = 0.0
+			best_match_cluster = None
+			for previous in previous_cc.clusters:
+				if previous.external_id and previous.external_id != -1:
+					similarity = cluster_similarity(previous, current_cluster)
+					if similarity >= merge_threshold and similarity > best_match_score:
+						best_match_score = similarity
+						best_match_cluster = previous
+			if best_match_cluster:
+				current_cluster.inherit_from_previous(best_match_cluster)
+				consumed_external_cluster_ids.add(best_match_cluster.external_id)
+
+		remaining_ids = available_external_ids - consumed_external_cluster_ids
+		return remaining_ids
 
 	def update_cluster_signatures(self):
 		signature_weights = calculate_signature_weights(
@@ -361,17 +387,31 @@ class ClusterSet:
 				return class_cluster
 		return None
 
-	def inherit_from_previous(self, previous_cluster_set):
+	def inherit_from_previous(self, previous_cluster_set, merge_threshold):
 		if previous_cluster_set:
+			uninherited_ids = []
 			for previous_cc in previous_cluster_set.class_clusters:
 				for current_cc in self.class_clusters:
 					if current_cc.player_class == previous_cc.player_class:
-						current_cc.inherit_from_previous(previous_cc)
-						current_cc.update_cluster_signatures()
+						uninherited_class_ids = current_cc.inherit_from_previous(
+							previous_cc,
+							merge_threshold
+						)
+				uninherited_ids.extend(uninherited_class_ids)
+			return set(uninherited_ids)
 
 	def items(self):
 		for class_cluster in self.class_clusters:
 			yield (class_cluster.player_class, class_cluster.clusters)
+
+	def consolidate_clusters(self, merge_similarity):
+		for class_cluster in self.class_clusters:
+			print("\n\n****** Consolidating: %s ******" % class_cluster.player_class)
+			class_cluster.consolidate_clusters(merge_similarity)
+
+	def create_experimental_clusters(self, experimental_cluster_threshold=SMALL_CLUSTER_CUTOFF):
+		for class_cluster in self.class_clusters:
+			class_cluster.create_experimental_cluster(experimental_cluster_threshold)
 
 	def to_chart_data(self, with_external_ids=False, include_ccp_signature=False):
 		result = []
@@ -540,40 +580,14 @@ def create_cluster_set(
 			clusters
 		)
 		class_cluster.update_cluster_signatures()
-
-		if consolidate:
-			print("\n\n****** Consolidating: %s ******" % player_class)
-			class_cluster.consolidate_clusters(merge_similarity)
-
-		if create_experimental_cluster:
-			final_clusters = []
-			experimental_cluster_data_points = []
-			for cluster in class_cluster.clusters:
-				# check single_deck_max to make sure there will be at least one deck
-				# eligible for global stats
-				if cluster.observations >= SMALL_CLUSTER_CUTOFF: # and cluster.single_deck_max_observations >= 1000:
-					final_clusters.append(cluster)
-				else:
-					experimental_cluster_data_points.extend(cluster.data_points)
-
-			if len(experimental_cluster_data_points):
-				experimental_cluster = Cluster.create(
-					factory.CLUSTER_FACTORY,
-					self,
-					-1,
-					experimental_cluster_data_points
-				)
-				final_clusters.append(experimental_cluster)
-
-			class_cluster = ClassClusters.create(
-				factory.CLASS_CLUSTER_FACTORY,
-				self,
-				int(CardClass[player_class]),
-				final_clusters
-			)
-			class_cluster.update_cluster_signatures()
-
 		class_clusters.append(class_cluster)
 
 	self.class_clusters = class_clusters
+
+	if consolidate:
+		self.consolidate_clusters(merge_similarity)
+
+	if create_experimental_cluster:
+		self.create_experimental_clusters()
+
 	return self
