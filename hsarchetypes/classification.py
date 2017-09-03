@@ -1,18 +1,18 @@
 
-def classify_deck(deck, archetype_ids, signature_weights):
+def classify_deck(deck, signature_weights):
 	distances = []
 	archetype_normalizers, cutoff_threshold = calculate_archetype_normalizers(signature_weights)
 
-	for archetype_id in archetype_ids:
+	for cluster_id, weights in signature_weights.items():
 		distance = 0
-		if archetype_id in signature_weights:
-			for dbf_id, weight in signature_weights[archetype_id].items():
-				if dbf_id in deck:
-					distance += weight * float(deck[dbf_id])
-			distance *= archetype_normalizers[archetype_id]
+
+		for dbf_id, weight in weights.items():
+			if dbf_id in deck:
+				distance += weight * float(deck[dbf_id])
+		distance *= archetype_normalizers[cluster_id]
 
 		if distance and distance >= cutoff_threshold:
-			distances.append((archetype_id, distance))
+			distances.append((cluster_id, distance))
 
 	if distances:
 		distances = sorted(distances, key=lambda t: t[1], reverse=True)
