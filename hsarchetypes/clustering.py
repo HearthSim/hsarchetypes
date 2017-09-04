@@ -104,6 +104,10 @@ def _most_similar_pair(clusters, distance_function):
 		if not c1.can_merge(c2):
 			continue
 
+		if c1.must_merge(c2):
+			print("External IDs Match.\n%s\n%s\nMust Merge" % (c1, c2))
+			return c1, c2, 1.0
+
 		sim_score = distance_function(c1, c2)
 		result.append((c1, c2, sim_score))
 
@@ -226,6 +230,13 @@ class Cluster:
 				if not r(d):
 					return False
 		return True
+
+	def must_merge(self, other_cluster):
+		self_has_id = self.external_id is not None
+		other_has_id = other_cluster.external_id is not None
+		# use can_merge to ensure they have compatible FP rule sets
+		can_merge = self.can_merge(other_cluster)
+		return self_has_id and other_has_id and can_merge
 
 	def can_merge(self, other_cluster):
 		other_satisfies_self = self.satisfies_rules(other_cluster.rules)
