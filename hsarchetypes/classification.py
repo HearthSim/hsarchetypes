@@ -1,3 +1,5 @@
+from .utils import to_prediction_vector
+
 
 def classify_deck(deck, signature_weights):
 	distances = []
@@ -37,3 +39,42 @@ def calculate_archetype_normalizers(signature_weights):
 		if archetype_id != largest_signature_id:
 			result[archetype_id] = largest_signature_max_score / float(sum(signature.values()))
 	return result, cutoff_threshold
+
+
+def train_neural_net(train_x, train_Y, model_data_path, batch_size=1000, num_epochs=10):
+	from keras.models import Sequential
+	from keras.layers import Dense, Dropout
+
+	num_features = train_x.shape()[1]
+	num_classes = train_Y.shape()[1]
+
+	model = Sequential()
+	model.add(Dense(512, input_dim=num_features, activation='relu'))
+	model.add(Dropout(0.2))
+	model.add(Dense(64, activation='relu'))
+	model.add(Dropout(0.2))
+	model.add(Dense(64, activation='relu'))
+	model.add(Dropout(0.2))
+	model.add(Dense(num_classes, activation='softmax'))
+
+	model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+	history = model.fit(
+		train_x,
+		train_Y,
+		validation_split=0.10,
+		batch_size=batch_size,
+		nb_epoch=num_epochs
+	)
+	model.save(model_data_path)
+
+	return history
+
+
+def load_model(model_data_path):
+	from keras.models import load_model
+	return load_model(model_data_path)
+
+
+def predict_external_id(model, class_cluster, data_point):
+	prediction = model.predict_classes(to_prediction_vector(data_point))
+	return class_cluster.one_hot_external_ids(inverse=True)[prediction[0]]

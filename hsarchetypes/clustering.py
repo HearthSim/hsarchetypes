@@ -287,6 +287,17 @@ class ClassClusters:
 		for cluster in self.clusters:
 			yield (cluster.cluster_id, cluster.data_points)
 
+	def one_hot_external_ids(self, inverse=False):
+		external_ids = []
+		for c in self.clusters:
+			if c.external_id is not None and c.external_id != -1:
+				external_ids.append(c.external_id)
+
+		if inverse:
+			return {index: id for index, id in enumerate(sorted(external_ids))}
+		else:
+			return {id: index for index, id in enumerate(sorted(external_ids))}
+
 	def create_experimental_cluster(self, experimental_cluster_threshold):
 		final_clusters = []
 		experimental_cluster_data_points = []
