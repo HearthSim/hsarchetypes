@@ -1,4 +1,4 @@
-from .utils import to_prediction_vector
+from .utils import to_prediction_vector_from_dbf_map
 
 
 def classify_deck(deck, signature_weights):
@@ -41,20 +41,29 @@ def calculate_archetype_normalizers(signature_weights):
 	return result, cutoff_threshold
 
 
-def train_neural_net(train_x, train_Y, model_data_path, batch_size=1000, num_epochs=10):
+def train_neural_net(
+	train_x,
+	train_Y,
+	model_data_path,
+	batch_size=1000,
+	num_epochs=10,
+	base_layer_size = 128,
+	hidden_layer_size = 64,
+	num_hidden_layers = 2
+):
+	from keras.callbacks import EarlyStopping
 	from keras.models import Sequential
 	from keras.layers import Dense, Dropout
 
-	num_features = train_x.shape()[1]
-	num_classes = train_Y.shape()[1]
+	num_features = train_x.shape[1]
+	num_classes = train_Y.shape[1]
 
 	model = Sequential()
-	model.add(Dense(512, input_dim=num_features, activation='relu'))
+	model.add(Dense(base_layer_size, input_dim=num_features, activation='relu'))
 	model.add(Dropout(0.2))
-	model.add(Dense(64, activation='relu'))
-	model.add(Dropout(0.2))
-	model.add(Dense(64, activation='relu'))
-	model.add(Dropout(0.2))
+	for i in range(num_hidden_layers):
+		model.add(Dense(hidden_layer_size, activation='relu'))
+		model.add(Dropout(0.2))
 	model.add(Dense(num_classes, activation='softmax'))
 
 	model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
@@ -63,7 +72,8 @@ def train_neural_net(train_x, train_Y, model_data_path, batch_size=1000, num_epo
 		train_Y,
 		validation_split=0.10,
 		batch_size=batch_size,
-		nb_epoch=num_epochs
+		epochs=num_epochs,
+		callbacks=[EarlyStopping(monitor='val_acc', patience=2, verbose=1),]
 	)
 	model.save(model_data_path)
 
@@ -76,5 +86,5 @@ def load_model(model_data_path):
 
 
 def predict_external_id(model, class_cluster, data_point):
-	prediction = model.predict_classes(to_prediction_vector(data_point))
+	prediction = model.predict_classes(to_prediction_vector_from_dbf_map(data_point["cards"]))
 	return class_cluster.one_hot_external_ids(inverse=True)[prediction[0]]

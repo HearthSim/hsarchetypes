@@ -79,36 +79,60 @@ def to_tribe_vector(deck):
 	return [float(tribe_count[r]) / num_cards for r in Race]
 
 
-def to_neural_net_training_data(class_clusters, num_examples=1000000, max_dropped_cards=15):
+def to_neural_net_training_data(
+		class_cluster,
+		num_examples=1000000,  # Actually train on 10MM
+		max_dropped_cards=15,
+		stratified=False,
+		min_cards_for_determination=5  # Minimum cards needed to make a determination
+	):
 	import numpy as np
+	print("Generating %i examples of training data with %i max dropped cards" % (num_examples, max_dropped_cards))
 
 	card_encoding = one_hot_encoding()
-	id_encoding = class_clusters.one_hot_external_ids()
+	id_encoding = class_cluster.one_hot_external_ids()
 
-	num_features = len(card_encoding) + 1
-	num_classes = len(id_encoding) + 1
+	num_features = len(card_encoding)
+	num_classes = len(id_encoding)
 
 	train_x = np.zeros((num_examples, num_features))
 	train_Y = np.zeros((num_examples, num_classes))
 	row_id = 0
 
-	for cluster in class_clusters.clusters:
-		if cluster.external_id is None or cluster.external_id == -1:
+	total_observations_for_class = 0.0
+	for c in class_cluster.clusters:
+		if c.external_id is not None:
+			total_observations_for_class += c.observations
+
+	print("total observations across the player class is: %i" % total_observations_for_class)
+	for cluster in class_cluster.clusters:
+		if cluster.external_id is None:
 			continue
 
 		total_observations = float(cluster.observations)
+		if stratified:
+			examples_for_cluster = int(num_examples * (total_observations / total_observations_for_class))
+		else:
+			examples_for_cluster = int(num_examples / num_classes)
+
+		tmpl = "Total observations in cluster with external_id %i and %i data points is %i, will generate %i examples"
+		number_of_decks = len(cluster.data_points)
+		print(tmpl % (cluster.external_id, number_of_decks, total_observations, examples_for_cluster))
 		for data_point in cluster.data_points:
 			cards = []
 			for dbf_id, count in data_point["cards"].items():
 				cards.append([card_encoding[int(dbf_id)], count])
 
-			examples = num_examples * (data_point["observations"] / total_observations)
+			if stratified:
+				examples = int(examples_for_cluster * (data_point["observations"] / total_observations))
+			else:
+				examples = int(examples_for_cluster / number_of_decks)
 
-			for i in range(int(examples)):
+			for i in range(examples):
 				shuffle(cards)
 				truncate_deck_count = len(cards) - randint(0, max_dropped_cards)
-				if truncate_deck_count < 5:
-					truncate_deck_count = 5
+				if truncate_deck_count < min_cards_for_determination:
+					truncate_deck_count = min_cards_for_determination
 
 				for c in cards[:truncate_deck_count]:
 					train_x[row_id][c[0]] = randint(0, c[1])
@@ -119,4 +143,5 @@ def to_neural_net_training_data(class_clusters, num_examples=1000000, max_droppe
 				if row_id > num_examples:
 					break
 
+	assert train_x.shape[0] == num_examples
 	return train_x, train_Y

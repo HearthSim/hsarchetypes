@@ -1,3 +1,4 @@
+import os
 from hearthstone.cardxml import load_dbf
 
 _CARD_DATA_CACHE = {}
@@ -18,16 +19,46 @@ def dbf_id_vector():
 
 
 def one_hot_encoding():
-	return {dbf_id: index for index, dbf_id in enumerate(dbf_id_vector())}
+	if "one_hot_encoding" not in _CARD_DATA_CACHE:
+		_CARD_DATA_CACHE["one_hot_encoding"] = {dbf_id: index for index, dbf_id in enumerate(dbf_id_vector())}
+	return _CARD_DATA_CACHE["one_hot_encoding"]
 
 
-def to_prediction_vector(data_point):
+def to_prediction_vector_from_dbf_map(dbf_map):
 	import numpy as np
 	card_encoding = one_hot_encoding()
 	num_features = len(card_encoding) + 1
 	result = np.zeros((1, num_features))
 
-	for dbf_id, count in data_point['cards'].items():
+	for dbf_id, count in dbf_map.items():
 		result[0][card_encoding[int(dbf_id)]] = count
 
 	return result
+
+
+def plot_loss_graph(history, player_class, output_path):
+	import matplotlib
+	matplotlib.use('Agg')
+	import matplotlib.pyplot as plt
+	plt.plot(history.history['loss'])
+	plt.plot(history.history['val_loss'])
+	plt.title('%s model loss' % player_class)
+	plt.ylabel('loss')
+	plt.xlabel('epoch')
+	plt.legend(['train', 'test'], loc='upper left')
+	plt.savefig(output_path)
+	plt.clf()
+
+
+def plot_accuracy_graph(history, player_class, output_path):
+	import matplotlib
+	matplotlib.use('Agg')
+	import matplotlib.pyplot as plt
+	plt.plot(history.history['acc'])
+	plt.plot(history.history['val_acc'])
+	plt.title('%s model accuracy' % player_class)
+	plt.ylabel('accuracy')
+	plt.xlabel('epoch')
+	plt.legend(['train', 'test'], loc='upper left')
+	plt.savefig(output_path)
+	plt.clf()

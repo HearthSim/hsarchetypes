@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 from itertools import combinations
 from hearthstone.enums import CardClass
@@ -167,7 +168,17 @@ class Cluster:
 		self._cluster_set = None
 
 	@staticmethod
-	def create(factory, cluster_set, cluster_id, data_points, signature=None, name="NEW", external_id=None, rules=None):
+	def create(
+		factory,
+		cluster_set,
+		cluster_id,
+		data_points,
+		signature=None,
+		ccp_signature=None,
+		name="NEW",
+		external_id=None,
+		rules=None
+	):
 		self = factory()
 		self._factory = factory
 		self._cluster_set = cluster_set
@@ -175,6 +186,7 @@ class Cluster:
 		self.cluster_id = cluster_id
 		self.data_points = data_points or []
 		self.signature = signature
+		self.ccp_signature = ccp_signature
 		self.name = "Experimental" if cluster_id == -1 else name
 		self.external_id = external_id
 		self.rules = rules or []
@@ -205,6 +217,19 @@ class Cluster:
 
 	def __repr__(self):
 		return str(self)
+
+	def to_json(self):
+		result = {
+			"cluster_id": self.cluster_id,
+			"experimental": self.experimental,
+			"signature": self.signature,
+			"name": self.name,
+			"rules": self.rules,
+			"data_points": self.data_points,
+			"external_id": self.external_id,
+			"ccp_signature": self.ccp_signature
+		}
+		return result
 
 	@property
 	def most_popular_deck(self):
@@ -282,6 +307,16 @@ class ClassClusters:
 	def __repr__(self):
 		return str(self)
 
+	def to_json(self):
+		result = {
+			"player_class": self.player_class.name,
+			"clusters": []
+		}
+		for cluster in self.clusters:
+			result["clusters"].append(cluster.to_json())
+
+		return result
+
 	def items(self):
 		# Act like a dictionary when passed to calculate_signature_weights(...)
 		for cluster in self.clusters:
@@ -290,7 +325,7 @@ class ClassClusters:
 	def one_hot_external_ids(self, inverse=False):
 		external_ids = []
 		for c in self.clusters:
-			if c.external_id is not None and c.external_id != -1:
+			if c.external_id is not None:
 				external_ids.append(c.external_id)
 
 		if inverse:
@@ -312,7 +347,8 @@ class ClassClusters:
 				self._cluster_set.CLUSTER_FACTORY,
 				self._cluster_set,
 				-1,
-				experimental_cluster_data_points
+				experimental_cluster_data_points,
+				external_id=-1,
 			)
 			final_clusters.append(experimental_cluster)
 		self.clusters = final_clusters
@@ -353,7 +389,7 @@ class ClassClusters:
 			cluster.signature = signature_weights.get(cluster.cluster_id, {})
 
 		ccp_signature_weights = calculate_signature_weights(
-			[(c.cluster_id, c.data_points) for c in self.clusters if c.external_id],
+			[(c.cluster_id, c.data_points) for c in self.clusters if c.external_id and c.external_id != -1],
 			use_ccp=True,
 			use_thresholds=USE_THRESHOLDS
 		)
@@ -426,6 +462,20 @@ class ClusterSet:
 		for class_cluster in self.class_clusters:
 			yield (class_cluster.player_class, class_cluster.clusters)
 
+	def to_json(self):
+		result = {
+			"as_of": self.as_of,
+			"game_format": self.game_format.name,
+			"live_in_production": self.live_in_production,
+			"latest": self.latest,
+			"class_clusters": []
+		}
+
+		for class_cluster in self.class_clusters:
+			result["class_clusters"].append(class_cluster.to_json())
+
+		return json.dumps(result, cls=DjangoJSONEncoder, indent=4)
+
 	def consolidate_clusters(self, merge_similarity):
 		for class_cluster in self.class_clusters:
 			print("\n\n****** Consolidating: %s ******" % class_cluster.player_class)
@@ -447,7 +497,7 @@ class ClusterSet:
 				"cluster_names": {}
 			}
 			for c in clusters:
-				if with_external_ids and not c.external_id:
+				if with_external_ids and (not c.external_id or c.external_id == -1):
 					continue
 				sig = [[int(dbf), weight] for dbf, weight in c.signature.items()]
 				player_class_result["signatures"][c.cluster_id] = sig
