@@ -140,7 +140,7 @@ def to_neural_net_training_data(
 				train_Y[row_id][id_encoding[cluster.external_id]] = 1
 				row_id += 1
 
-				if row_id > num_examples:
+				if row_id >= num_examples:
 					break
 
 	assert train_x.shape[0] == num_examples
