@@ -30,7 +30,8 @@ def to_prediction_vector_from_dbf_map(dbf_map):
 	result = [[0 for i in range(num_features)]]
 
 	for dbf_id, count in dbf_map.items():
-		result[0][card_encoding[int(dbf_id)]] = count
+		if int(dbf_id) in card_encoding:
+			result[0][card_encoding[int(dbf_id)]] = count
 
 	return result
 
