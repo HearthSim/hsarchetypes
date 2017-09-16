@@ -25,10 +25,9 @@ def one_hot_encoding():
 
 
 def to_prediction_vector_from_dbf_map(dbf_map):
-	import numpy as np
 	card_encoding = one_hot_encoding()
 	num_features = len(card_encoding)
-	result = np.zeros((1, num_features))
+	result = [[0 for i in range(num_features)]]
 
 	for dbf_id, count in dbf_map.items():
 		result[0][card_encoding[int(dbf_id)]] = count
