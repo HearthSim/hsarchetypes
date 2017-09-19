@@ -485,7 +485,7 @@ class ClusterSet:
 		for class_cluster in self.class_clusters:
 			class_cluster.create_experimental_cluster(experimental_cluster_threshold)
 
-	def to_chart_data(self, with_external_ids=False, include_ccp_signature=False):
+	def to_chart_data(self, with_external_ids=False, include_ccp_signature=False, as_of=""):
 		result = []
 		for player_class, clusters in self.items():
 			player_class_result = {
@@ -494,7 +494,8 @@ class ClusterSet:
 				"signatures": {},
 				"ccp_signatures": {},
 				"cluster_map": {},
-				"cluster_names": {}
+				"cluster_names": {},
+				"as_of": as_of
 			}
 			for c in clusters:
 				if with_external_ids and (not c.external_id or c.external_id == -1):
