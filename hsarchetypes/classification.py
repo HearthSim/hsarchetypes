@@ -53,7 +53,6 @@ def train_neural_net(
 ):
 	import tensorflow as tf
 	sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
-
 	from keras.callbacks import EarlyStopping
 	from keras.models import Sequential
 	from keras.layers import Dense, Dropout

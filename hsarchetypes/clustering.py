@@ -474,7 +474,7 @@ class ClusterSet:
 		for class_cluster in self.class_clusters:
 			result["class_clusters"].append(class_cluster.to_json())
 
-		return json.dumps(result, cls=DjangoJSONEncoder, indent=4)
+		return json.dumps(result, indent=4)
 
 	def consolidate_clusters(self, merge_similarity):
 		for class_cluster in self.class_clusters:
@@ -512,7 +512,6 @@ class ClusterSet:
 						"games": int(data_point["observations"]),
 						"cluster_name": cur_arch_name,
 						"cluster_id": int(data_point["cluster_id"]),
-						"win_rate": data_point["win_rate"],
 						"shortid": data_point.get("shortid", None),
 						"deck_list": data_point.get("card_list", None),
 					}
