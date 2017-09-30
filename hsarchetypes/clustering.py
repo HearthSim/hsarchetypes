@@ -485,7 +485,7 @@ class ClusterSet:
 		for class_cluster in self.class_clusters:
 			class_cluster.create_experimental_cluster(experimental_cluster_threshold)
 
-	def to_chart_data(self, with_external_ids=False, include_ccp_signature=False, as_of=""):
+	def to_chart_data(self, with_external_ids=False, include_ccp_signature=False, as_of="", external_names={}):
 		result = []
 		for player_class, clusters in self.items():
 			player_class_result = {
@@ -502,13 +502,19 @@ class ClusterSet:
 					continue
 				sig = [[int(dbf), weight] for dbf, weight in c.signature.items()]
 				player_class_result["signatures"][c.cluster_id] = sig
+				if c.external_id:
+					if c.external_id in external_names and c.cluster_id not in player_class_result["cluster_names"]:
+						player_class_result["cluster_names"][c.cluster_id] = external_names.get(c.external_id, "NEW")
 				if include_ccp_signature:
 					ccp_sig = [[int(dbf), weight] for dbf, weight in c.ccp_signature.items()]
 					player_class_result["ccp_signatures"][c.cluster_id] = ccp_sig
 				player_class_result["cluster_map"][c.cluster_id] = c.external_id
 				for data_point in c.data_points:
-					cur_arch_name = str(data_point["archetype_name"] or data_point["cluster_id"])
-					player_class_result["cluster_names"][c.cluster_id] = cur_arch_name
+					external_name = external_names.get(c.external_id, "")
+					arch_name = data_point["archetype_name"]
+					cluster_id = data_point["cluster_id"]
+					cur_arch_name = str(external_name or arch_name or cluster_id)
+					# player_class_result["cluster_names"][c.cluster_id] = cur_arch_name
 					metadata = {
 						"games": int(data_point["observations"]),
 						"cluster_name": cur_arch_name,
