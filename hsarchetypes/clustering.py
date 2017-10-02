@@ -275,9 +275,15 @@ class Cluster:
 		self._augment_data_points()
 
 	def pretty_signature_string(self, sep=", "):
+		return self._to_pretty_string(self.signature)
+
+	def pretty_ccp_signature_string(self, sep=", "):
+		return self._to_pretty_string(self.ccp_signature)
+
+	def _to_pretty_string(self, sig, sep=", "):
 		db = card_db()
 		components = {}
-		for dbf_id, weight in self.signature.items():
+		for dbf_id, weight in sig.items():
 			components[db[int(dbf_id)].name] = weight
 		sorted_components = sorted(components.items(), key=lambda t: t[1], reverse=True)
 		return sep.join(["%s:%s" % (n, str(round(w, 4))) for n, w in sorted_components])
