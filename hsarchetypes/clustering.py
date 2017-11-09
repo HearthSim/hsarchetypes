@@ -1,4 +1,5 @@
 import json
+import logging
 from copy import deepcopy
 from itertools import combinations
 from hearthstone.enums import CardClass
@@ -6,6 +7,10 @@ from .features import *
 from .rules import *
 from .signatures import calculate_signature_weights
 from .utils import card_db, dbf_id_vector
+
+
+logger = logging.getLogger("hsarchetypes")
+logger.setLevel(logging.INFO)
 
 
 NUM_CLUSTERS = 20
@@ -72,40 +77,19 @@ def find_closest_cluster_pair(clusterset_a, clusterset_b, cmp=cluster_similarity
 	return best_match
 
 
-def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
-	import numpy as np
-	distances_all = []
-	for c1, c2 in combinations(clusters, 2):
-		sim_score = distance_function(c1, c2)
-		distances_all.append(round(sim_score, 2))
-
-	wr = np.array(distances_all)
-	mean = np.mean(wr, axis=0)
-	std = np.std(wr, axis=0)
-
-	similarity_threshold = SIMILARITY_THRESHOLD_FLOOR
-	# similarity_threshold = max(SIMILARITY_THRESHOLD_FLOOR, mean + (std * 1.8))
-	# similarity_threshold is how similar two clusters must be to be eligible to be merged
-	# As this value gets larger, we will be less aggressive about merging clusters
-	msg = "\nsimilarity threshold: %s, mean:%s, std:%s\n"
-	values = (round(similarity_threshold, 2), round(mean,2), round(std, 2))
-	print(msg % values)
-
-	return similarity_threshold
-
-
 def _do_merge_clusters(cluster_factory, cluster_set, clusters, distance_function, minimum_simularity):
 	next_cluster_id = max([c.cluster_id for c in clusters]) + 1
 	current_clusters = list(clusters)
 
 	most_similar = _most_similar_pair(current_clusters, distance_function)
 	if most_similar:
-		print("%s\n%s\nMost Similar Pair With Score: %s" % most_similar)
+		logger.info("%s\n%s\nMost Similar Pair With Score: %s" % most_similar)
+
 	if not most_similar or most_similar[2] < minimum_simularity:
-		print("Does Not Meet Minimum Simularity")
+		logger.info("Clusters do not meet minimum similarity")
 		return current_clusters
 	else:
-		print("They Will Be Merged")
+		logger.info("Clusters will be merged.")
 
 	c1, c2, sim_score = most_similar
 	new_cluster = merge_clusters(cluster_factory, cluster_set, next_cluster_id, [c1, c2])
@@ -113,6 +97,7 @@ def _do_merge_clusters(cluster_factory, cluster_set, clusters, distance_function
 	for c in current_clusters:
 		if c.cluster_id not in (c1.cluster_id, c2.cluster_id):
 			next_clusters_list.append(c)
+
 	return next_clusters_list
 
 
@@ -124,7 +109,7 @@ def _most_similar_pair(clusters, distance_function):
 			continue
 
 		if c1.must_merge(c2):
-			print("External IDs Match.\n%s\n%s\nMust Merge" % (c1, c2))
+			logger.info("External IDs Match.\n%s\n%s\nMust Merge" % (c1, c2))
 			return c1, c2, 1.0
 
 		sim_score = distance_function(c1, c2)
@@ -153,17 +138,17 @@ def merge_clusters(cluster_factory, cluster_set, new_cluster_id, clusters):
 				external_id = cluster.external_id
 				name = cluster.name
 			else:
-				msg = "Cannot merge clusters with different external IDs: (%s, %s)"
 				raise RuntimeError(
-					msg % (external_id, cluster.external_id)
+					"Cannot merge clusters with different external IDs: %r, %r" % (
+						external_id, cluster.external_id
+					)
 				)
 
 	for rule_name in new_cluster_rules:
 		rule = FALSE_POSITIVE_RULES[rule_name]
 		if not all(rule(d) for d in new_cluster_data_points):
-			msg = "Not all data points in clusters to be merged pass rule: %s"
 			raise RuntimeError(
-				msg % (rule_name)
+				"Not all data points in clusters to be merged pass rule: %s" % (rule_name)
 			)
 
 	return Cluster.create(
@@ -178,24 +163,19 @@ def merge_clusters(cluster_factory, cluster_set, new_cluster_id, clusters):
 
 
 class Cluster:
-	"""A cluster is a collection of data points representing decks that share a similar strategy"""
+	"""
+	A collection of data points representing decks that share a similar strategy.
+	"""
 
 	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
 		self._factory = None
 		self._cluster_set = None
 
 	@staticmethod
 	def create(
-		factory,
-		cluster_set,
-		cluster_id,
-		data_points,
-		signature=None,
-		ccp_signature=None,
-		name="NEW",
-		external_id=None,
-		rules=None
+		factory, cluster_set, cluster_id, data_points,
+		signature=None, ccp_signature=None,
+		name="NEW", external_id=None, rules=None
 	):
 		self = factory()
 		self._factory = factory
@@ -385,14 +365,17 @@ class ClassClusters:
 			if c.external_id and c.external_id != EXPERIMENTAL
 		]
 		new_clusters = list(self.clusters)
+		logger.info("Attempting inheritance")
 
 		while old_clusters:
 			old, new, similarity = find_closest_cluster_pair(old_clusters, new_clusters)
 			if similarity >= merge_threshold:
+				logger.info("Found pair with similarity %r: %r, %r", similarity, old, new)
 				new.inherit_from_previous(old)
 				old_clusters.remove(old)
 				new_clusters.remove(new)
 			else:
+				logger.info("Similarity hit %r, stopping inheritance", similarity)
 				break
 
 		return set(old.external_id for old in old_clusters)
@@ -497,7 +480,7 @@ class ClusterSet:
 
 	def consolidate_clusters(self, merge_similarity):
 		for class_cluster in self.class_clusters:
-			print("\n\n****** Consolidating: %s ******" % class_cluster.player_class)
+			logger.info("****** Consolidating: %s ******", class_cluster.player_class)
 			class_cluster.consolidate_clusters(merge_similarity)
 
 	def create_experimental_clusters(self, experimental_cluster_threshold=SMALL_CLUSTER_CUTOFF):
