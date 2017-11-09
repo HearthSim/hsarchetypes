@@ -76,30 +76,6 @@ def find_closest_cluster_pair(clusterset_a, clusterset_b, cmp=cluster_similarity
 	return best_match
 
 
-def _do_merge_clusters(cluster_factory, cluster_set, clusters, distance_function, minimum_simularity):
-	next_cluster_id = max([c.cluster_id for c in clusters]) + 1
-	current_clusters = list(clusters)
-
-	most_similar = _most_similar_pair(current_clusters, distance_function)
-	if most_similar:
-		logger.info("%s\n%s\nMost Similar Pair With Score: %s" % most_similar)
-
-	if not most_similar or most_similar[2] < minimum_simularity:
-		logger.info("Clusters do not meet minimum similarity")
-		return current_clusters
-	else:
-		logger.info("Clusters will be merged.")
-
-	c1, c2, sim_score = most_similar
-	new_cluster = merge_clusters(cluster_factory, cluster_set, next_cluster_id, [c1, c2])
-	next_clusters_list = [new_cluster]
-	for c in current_clusters:
-		if c.cluster_id not in (c1.cluster_id, c2.cluster_id):
-			next_clusters_list.append(c)
-
-	return next_clusters_list
-
-
 def _most_similar_pair(clusters, distance_function):
 	result = []
 
@@ -114,11 +90,9 @@ def _most_similar_pair(clusters, distance_function):
 		sim_score = distance_function(c1, c2)
 		result.append((c1, c2, sim_score))
 
-	if len(result):
+	if result:
 		sorted_result = sorted(result, key=lambda t: t[2], reverse=True)
 		return sorted_result[0]
-	else:
-		return None
 
 
 def merge_clusters(cluster_factory, cluster_set, new_cluster_id, clusters):
@@ -413,16 +387,39 @@ class ClassClusters:
 			self.update_cluster_signatures()
 
 	def _attempt_consolidation(self, similarity_threshold, distance_function=cluster_similarity):
-		new_clusters = _do_merge_clusters(
-			self._cluster_set.CLUSTER_FACTORY,
-			self._cluster_set,
-			self.clusters,
-			distance_function,
-			similarity_threshold
-		)
+		new_clusters = self._do_merge_clusters(distance_function, similarity_threshold)
 		success = len(new_clusters) < len(self.clusters)
 		self.clusters = new_clusters
 		return success
+
+	def _do_merge_clusters(self, distance_function, minimum_simularity):
+		cluster_set = self._cluster_set
+		cluster_factory = cluster_set.CLUSTER_FACTORY
+		next_cluster_id = max(c.cluster_id for c in self.clusters) + 1
+		current_clusters = list(self.clusters)
+
+		most_similar = _most_similar_pair(current_clusters, distance_function)
+		if most_similar:
+			logger.info("Most similar clusters: %r: %r - %r score = %r",
+				CardClass(self.player_class), most_similar[0].cluster_id,
+				most_similar[1].cluster_id, most_similar[2]
+			)
+			logger.info(most_similar[0])
+			logger.info(most_similar[1])
+
+		if not most_similar or most_similar[2] < minimum_simularity:
+			logger.info("Clusters do not meet minimum similarity")
+			return current_clusters
+
+		logger.info("Clusters will be merged.")
+		c1, c2, sim_score = most_similar
+		new_cluster = merge_clusters(cluster_factory, cluster_set, next_cluster_id, [c1, c2])
+		next_clusters_list = [new_cluster]
+		for c in current_clusters:
+			if c.cluster_id not in (c1.cluster_id, c2.cluster_id):
+				next_clusters_list.append(c)
+
+		return next_clusters_list
 
 
 class ClusterSet:
