@@ -54,6 +54,24 @@ def cluster_similarity(c1, c2):
 	return weighted_score
 
 
+def find_closest_cluster_pair(clusterset_a, clusterset_b, cmp=cluster_similarity):
+	"""
+	Take from two clustersets a and b and find the closest pair of its member
+	clusters. Optionally takes a `cmp` comparator function argument.
+
+	Returns: member_a, member_b, similarity_score
+	"""
+	best_match = (None, None, -1)
+
+	for cluster_a in clusterset_a:
+		for cluster_b in clusterset_b:
+			similarity = cmp(cluster_a, cluster_b)
+			if similarity > best_match[2]:
+				best_match = (cluster_a, cluster_b, similarity)
+
+	return best_match
+
+
 def _analyze_cluster_space(clusters, distance_function=cluster_similarity):
 	import numpy as np
 	distances_all = []
@@ -361,28 +379,23 @@ class ClassClusters:
 		self.update_cluster_signatures()
 
 	def inherit_from_previous(self, previous_cc, merge_threshold):
-		consumed_external_cluster_ids = set()
-		available_external_ids = set()
+		EXPERIMENTAL = -1
+		old_clusters = [
+			c for c in previous_cc.clusters
+			if c.external_id and c.external_id != EXPERIMENTAL
+		]
+		new_clusters = list(self.clusters)
 
-		for c in previous_cc.clusters:
-			if c.external_id and c.external_id != -1:
-				available_external_ids.add(c.external_id)
+		while old_clusters:
+			old, new, similarity = find_closest_cluster_pair(old_clusters, new_clusters)
+			if similarity >= merge_threshold:
+				new.inherit_from_previous(old)
+				old_clusters.remove(old)
+				new_clusters.remove(new)
+			else:
+				break
 
-		for current_cluster in self.clusters:
-			best_match_score = 0.0
-			best_match_cluster = None
-			for previous in previous_cc.clusters:
-				if previous.external_id and previous.external_id != -1:
-					similarity = cluster_similarity(previous, current_cluster)
-					if similarity >= merge_threshold and similarity > best_match_score:
-						best_match_score = similarity
-						best_match_cluster = previous
-			if best_match_cluster:
-				current_cluster.inherit_from_previous(best_match_cluster)
-				consumed_external_cluster_ids.add(best_match_cluster.external_id)
-
-		remaining_ids = available_external_ids - consumed_external_cluster_ids
-		return remaining_ids
+		return set(old.external_id for old in old_clusters)
 
 	def update_cluster_signatures(self):
 		signature_weights = calculate_signature_weights(
