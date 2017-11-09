@@ -10,7 +10,6 @@ from .utils import card_db, dbf_id_vector
 
 
 logger = logging.getLogger("hsarchetypes")
-logger.setLevel(logging.INFO)
 
 
 NUM_CLUSTERS = 20
@@ -364,7 +363,9 @@ class ClassClusters:
 			c for c in previous_cc.clusters
 			if c.external_id and c.external_id != EXPERIMENTAL
 		]
-		new_clusters = list(self.clusters)
+		new_clusters = [
+			c for c in self.clusters if c.external_id != EXPERIMENTAL
+		]
 		logger.info("Attempting inheritance")
 
 		while old_clusters:
