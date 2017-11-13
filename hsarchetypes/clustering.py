@@ -1,7 +1,6 @@
 import json
 import logging
 from copy import deepcopy
-from collections import Counter
 from itertools import combinations
 from hearthstone.enums import CardClass
 from .features import *
@@ -313,20 +312,6 @@ class ClassClusters:
 		else:
 			return {id: index for index, id in enumerate(sorted(list(external_ids)))}
 
-	@property
-	def global_prevalence(self):
-		card_counter = Counter()
-		data_point_count = 0
-		for cluster in self.clusters:
-			for data_point in cluster.data_points:
-				data_point_count += 1
-				for dbf_id in data_point["cards"]:
-					card_counter[dbf_id] += 1
-
-		return {
-			str(dbf_id): card_counter[dbf_id] / data_point_count for dbf_id in card_counter
-		}
-
 	def create_experimental_cluster(self, experimental_cluster_threshold):
 		final_clusters = []
 		experimental_cluster_data_points = []
@@ -373,16 +358,10 @@ class ClassClusters:
 		return set(old.external_id for old in old_clusters)
 
 	def update_cluster_signatures(self):
-		global_prevalence = self.global_prevalence
-		print("GLOBAL PREVALANCE DUMP")
-		for dbf_id, prev in global_prevalence.items():
-			print("%s->%s" % (db[int(dbf_id)].name, prev))
-
 		signature_weights = calculate_signature_weights(
 			[(c.cluster_id, c.data_points) for c in self.clusters],
 			use_ccp=False,
-			use_thresholds=USE_THRESHOLDS,
-			global_prevalence=global_prevalence
+			use_thresholds=USE_THRESHOLDS
 		)
 
 		for cluster in self.clusters:
@@ -391,8 +370,7 @@ class ClassClusters:
 		ccp_signature_weights = calculate_signature_weights(
 			[(c.cluster_id, c.data_points) for c in self.clusters if c.external_id and c.external_id != -1],
 			use_ccp=True,
-			use_thresholds=USE_THRESHOLDS,
-			global_prevalence=global_prevalence
+			use_thresholds=USE_THRESHOLDS
 		)
 
 		for cluster in self.clusters:

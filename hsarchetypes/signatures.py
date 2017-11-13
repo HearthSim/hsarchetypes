@@ -1,4 +1,5 @@
 from copy import copy
+from collections import Counter
 
 
 ARCHETYPE_CORE_CARD_THRESHOLD = .8
@@ -13,13 +14,29 @@ default_thresholds = {
 }
 
 
+def calculate_player_class_prevalence(cluster_data):
+		card_counter = Counter()
+		deck_occurrences = 0.0
+		for cluster_id, cluster_decks in cluster_data:
+			for deck in cluster_decks:
+				obs_count = deck["observations"]
+				deck_occurrences += obs_count
+				for dbf_id, count in deck["cards"].items():
+					card_counter[dbf_id] += obs_count
+
+		return {
+			str(dbf_id): card_counter[dbf_id] / deck_occurrences for dbf_id in card_counter
+		}
+
+
 def calculate_signature_weights(
 	cluster_data,
 	thresholds=default_thresholds,
 	use_ccp=True,
-	use_thresholds=True,
-	global_prevalence=None
+	use_thresholds=True
 ):
+
+	pcp_weights = calculate_player_class_prevalence(cluster_data)
 	# For each archetype generate new signatures.
 	raw_new_weights = {}
 	for cluster_id, cluster_decks in cluster_data:
@@ -27,7 +44,7 @@ def calculate_signature_weights(
 			cluster_decks,
 			thresholds=thresholds,
 			use_thresholds=use_thresholds,
-			global_prevalence=global_prevalence
+			pcp_weights=pcp_weights
 		)
 
 	if use_ccp:
@@ -59,7 +76,7 @@ def generate_ccp_input_weights(input_weights, cutoff=.5):
 
 
 def calculate_signature_weights_for_cluster(
-	decks, thresholds=default_thresholds, use_thresholds=True, global_prevalence=None
+	decks, thresholds=default_thresholds, use_thresholds=True, pcp_weights=None
 ):
 	prevalence_counts = {}
 	deck_occurrences = 0
@@ -77,20 +94,20 @@ def calculate_signature_weights_for_cluster(
 		return []
 
 	return calculate_prevalences(
-		prevalence_counts, deck_occurrences, thresholds, use_thresholds, global_prevalence
+		prevalence_counts, deck_occurrences, thresholds, use_thresholds, pcp_weights
 	)
 
 
 def calculate_prevalences(
-	prevalence_counts, deck_occurrences, thresholds, use_thresholds, global_prevalence
+	prevalence_counts, deck_occurrences, thresholds, use_thresholds, pcp_weights
 ):
 	ret = {}
 	GLOBAL_PREVALANCE_THRESHOLD = .9
 
 	for dbf_id, observation_count in prevalence_counts.items():
 		prevalence = float(observation_count) / float(deck_occurrences)
-		if global_prevalence[dbf_id] >= GLOBAL_PREVALANCE_THRESHOLD:
-			prevalence = prevalence * (1 - global_prevalence[dbf_id] ** 2)
+		if pcp_weights[dbf_id] >= GLOBAL_PREVALANCE_THRESHOLD:
+			prevalence = prevalence * (1 - pcp_weights[dbf_id] ** 2)
 
 		if use_thresholds:
 			for threshold in sorted(thresholds.keys(), reverse=True):
