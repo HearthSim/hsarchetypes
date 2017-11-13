@@ -85,10 +85,12 @@ def calculate_prevalences(
 	prevalence_counts, deck_occurrences, thresholds, use_thresholds, global_prevalence
 ):
 	ret = {}
+	GLOBAL_PREVALANCE_THRESHOLD = .9
 
 	for dbf_id, observation_count in prevalence_counts.items():
 		prevalence = float(observation_count) / float(deck_occurrences)
-		prevalence = prevalence * (1 - global_prevalence[dbf_id] ** 3)
+		if global_prevalence[dbf_id] >= GLOBAL_PREVALANCE_THRESHOLD:
+			prevalence = prevalence * (1 - global_prevalence[dbf_id] ** 2)
 
 		if use_thresholds:
 			for threshold in sorted(thresholds.keys(), reverse=True):

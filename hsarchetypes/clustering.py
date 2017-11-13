@@ -374,6 +374,10 @@ class ClassClusters:
 
 	def update_cluster_signatures(self):
 		global_prevalence = self.global_prevalence
+		print("GLOBAL PREVALANCE DUMP")
+		for dbf_id, prev in global_prevalence.items():
+			print("%s->%s" % (db[int(dbf_id)].name, prev))
+
 		signature_weights = calculate_signature_weights(
 			[(c.cluster_id, c.data_points) for c in self.clusters],
 			use_ccp=False,
