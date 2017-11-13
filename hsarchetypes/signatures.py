@@ -34,10 +34,11 @@ def calculate_signature_weights(
 	cluster_data,
 	thresholds=default_thresholds,
 	use_ccp=True,
-	use_thresholds=True
+	use_thresholds=True,
+	use_pcp_adjustment=True
 ):
 
-	if not use_ccp:
+	if not use_ccp and use_pcp_adjustment:
 		pcp_weights = calculate_player_class_prevalence(cluster_data)
 	else:
 		pcp_weights = {}

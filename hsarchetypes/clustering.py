@@ -357,11 +357,12 @@ class ClassClusters:
 
 		return set(old.external_id for old in old_clusters)
 
-	def update_cluster_signatures(self):
+	def update_cluster_signatures(self, use_pcp_adjustment=True):
 		signature_weights = calculate_signature_weights(
 			[(c.cluster_id, c.data_points) for c in self.clusters],
 			use_ccp=False,
-			use_thresholds=USE_THRESHOLDS
+			use_thresholds=USE_THRESHOLDS,
+			use_pcp_adjustment=use_pcp_adjustment
 		)
 
 		for cluster in self.clusters:
@@ -370,7 +371,8 @@ class ClassClusters:
 		ccp_signature_weights = calculate_signature_weights(
 			[(c.cluster_id, c.data_points) for c in self.clusters if c.external_id and c.external_id != -1],
 			use_ccp=True,
-			use_thresholds=USE_THRESHOLDS
+			use_thresholds=USE_THRESHOLDS,
+			use_pcp_adjustment=use_pcp_adjustment
 		)
 
 		for cluster in self.clusters:
