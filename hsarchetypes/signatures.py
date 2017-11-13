@@ -37,7 +37,11 @@ def calculate_signature_weights(
 	use_thresholds=True
 ):
 
-	pcp_weights = calculate_player_class_prevalence(cluster_data)
+	if not use_ccp:
+		pcp_weights = calculate_player_class_prevalence(cluster_data)
+	else:
+		pcp_weights = {}
+
 	# For each archetype generate new signatures.
 	raw_new_weights = {}
 	for cluster_id, cluster_decks in cluster_data:
@@ -111,13 +115,13 @@ def calculate_prevalences(
 			for threshold in sorted(thresholds.keys(), reverse=True):
 				if prevalence >= threshold:
 					weight = float(thresholds[threshold]) * prevalence
-					if pcp_weights[dbf_id] >= PCP_THRESHOLD:
+					if pcp_weights.get(dbf_id, 0) >= PCP_THRESHOLD:
 						weight = weight * (1 - pcp_weights[dbf_id] ** 3)
 
 					ret[dbf_id] = weight
 					break
 		else:
-			if pcp_weights[dbf_id] >= PCP_THRESHOLD:
+			if pcp_weights.get(dbf_id, 0) >= PCP_THRESHOLD:
 				prevalence = prevalence * (1 - pcp_weights[dbf_id] ** 3)
 
 			ret[dbf_id] = prevalence
