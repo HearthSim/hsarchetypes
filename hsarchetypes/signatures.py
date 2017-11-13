@@ -107,7 +107,7 @@ def calculate_prevalences(
 	for dbf_id, observation_count in prevalence_counts.items():
 		prevalence = float(observation_count) / float(deck_occurrences)
 		if pcp_weights[dbf_id] >= GLOBAL_PREVALENCE_THRESHOLD:
-			prevalence = prevalence * (1 - pcp_weights[dbf_id] ** 2)
+			prevalence = prevalence * (1 - pcp_weights[dbf_id] ** 3)
 
 		if use_thresholds:
 			for threshold in sorted(thresholds.keys(), reverse=True):
