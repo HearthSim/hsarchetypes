@@ -6,7 +6,7 @@ ARCHETYPE_CORE_CARD_THRESHOLD = .8
 ARCHETYPE_CORE_CARD_WEIGHT = 1
 ARCHETYPE_TECH_CARD_THRESHOLD = .3
 ARCHETYPE_TECH_CARD_WEIGHT = .5
-GLOBAL_PREVALENCE_THRESHOLD = .7
+PCP_THRESHOLD = .7
 
 
 default_thresholds = {
@@ -106,16 +106,20 @@ def calculate_prevalences(
 
 	for dbf_id, observation_count in prevalence_counts.items():
 		prevalence = float(observation_count) / float(deck_occurrences)
-		if pcp_weights[dbf_id] >= GLOBAL_PREVALENCE_THRESHOLD:
-			prevalence = prevalence * (1 - pcp_weights[dbf_id] ** 3)
 
 		if use_thresholds:
 			for threshold in sorted(thresholds.keys(), reverse=True):
 				if prevalence >= threshold:
 					weight = float(thresholds[threshold]) * prevalence
+					if pcp_weights[dbf_id] >= PCP_THRESHOLD:
+						weight = weight * (1 - pcp_weights[dbf_id] ** 3)
+
 					ret[dbf_id] = weight
 					break
 		else:
+			if pcp_weights[dbf_id] >= PCP_THRESHOLD:
+				prevalence = prevalence * (1 - pcp_weights[dbf_id] ** 3)
+
 			ret[dbf_id] = prevalence
 
 	return ret
