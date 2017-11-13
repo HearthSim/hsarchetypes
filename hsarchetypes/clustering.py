@@ -181,9 +181,10 @@ class Cluster:
 
 		template = "Cluster %s - %i data points (%i games) - %s"
 		pretty_sig = []
-		for dbf, w in sorted(self.signature.items(), key=lambda t: t[1], reverse=True):
-			card = db[int(dbf)]
-			pretty_sig.append("%s:%s" % (card.name, round(w, 2)))
+		if self.signature is not None:
+			for dbf, w in sorted(self.signature.items(), key=lambda t: t[1], reverse=True):
+				card = db[int(dbf)]
+				pretty_sig.append("%s:%s" % (card.name, round(w, 2)))
 		return template % (str(c_id), len(self.data_points), self.observations, ", ".join(pretty_sig))
 
 	def __repr__(self):
