@@ -17,15 +17,17 @@ def calculate_signature_weights(
 	cluster_data,
 	thresholds=default_thresholds,
 	use_ccp=True,
-	use_thresholds=True
+	use_thresholds=True,
+	global_prevalence=None
 ):
 	# For each archetype generate new signatures.
 	raw_new_weights = {}
 	for cluster_id, cluster_decks in cluster_data:
 		raw_new_weights[cluster_id] = calculate_signature_weights_for_cluster(
 			cluster_decks,
-			thresholds,
-			use_thresholds
+			thresholds=thresholds,
+			use_thresholds=use_thresholds,
+			global_prevalence=global_prevalence
 		)
 
 	if use_ccp:
@@ -56,7 +58,9 @@ def generate_ccp_input_weights(input_weights, cutoff=.5):
 	return result
 
 
-def calculate_signature_weights_for_cluster(decks, thresholds=default_thresholds, use_thresholds=True):
+def calculate_signature_weights_for_cluster(
+	decks, thresholds=default_thresholds, use_thresholds=True, global_prevalence=None
+):
 	prevalence_counts = {}
 	deck_occurrences = 0
 
@@ -72,14 +76,19 @@ def calculate_signature_weights_for_cluster(decks, thresholds=default_thresholds
 		# Could not find any matching deck, break early
 		return []
 
-	return calculate_prevalences(prevalence_counts, deck_occurrences, thresholds, use_thresholds)
+	return calculate_prevalences(
+		prevalence_counts, deck_occurrences, thresholds, use_thresholds, global_prevalence
+	)
 
 
-def calculate_prevalences(prevalence_counts, deck_occurrences, thresholds, use_thresholds=True):
+def calculate_prevalences(
+	prevalence_counts, deck_occurrences, thresholds, use_thresholds, global_prevalence
+):
 	ret = {}
 
 	for dbf_id, observation_count in prevalence_counts.items():
 		prevalence = float(observation_count) / float(deck_occurrences)
+		prevalence = prevalence * (1 - global_prevalence[dbf_id] ** 3)
 
 		if use_thresholds:
 			for threshold in sorted(thresholds.keys(), reverse=True):
