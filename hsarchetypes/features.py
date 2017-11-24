@@ -53,7 +53,7 @@ def to_mechanic_vector(deck):
 		num_occurs = float(0)
 		for dbf_id, count in deck["cards"].items():
 			card = db[int(dbf_id)]
-			if card.tags.get(mechanic, 0):
+			if card.tags.get(mechanic, 0) or card.referenced_tags.get(mechanic, 0):
 				num_occurs += float(count)
 		mechanics_count.append(num_occurs / num_cards)
 
