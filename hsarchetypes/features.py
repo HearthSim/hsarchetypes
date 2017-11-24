@@ -42,6 +42,7 @@ mechanics = [
 	GameTag.SILENCE,
 	GameTag.TAUNT,
 	GameTag.WINDFURY,
+	GameTag.JADE_GOLEM,
 ]
 
 
