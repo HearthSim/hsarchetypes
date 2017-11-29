@@ -556,11 +556,11 @@ def create_cluster_set(
 	self._factory = factory
 
 	data = deepcopy(input_data)
-	base_vector = dbf_id_vector()
 
 	class_clusters = []
 	for player_class, data_points in data.items():
 		X = []
+		base_vector = dbf_id_vector(player_class=player_class)
 		for data_point in data_points:
 			cards = data_point["cards"]
 			vector = [float(cards.get(str(dbf_id), 0)) / 2.0 for dbf_id in base_vector]
@@ -603,7 +603,6 @@ def create_cluster_set(
 		else:
 			# No data points for this class so don't include it
 			continue
-
 
 		X = StandardScaler().fit_transform(X)
 		clusterizer = KMeans(n_clusters=min(int(num_clusters), len(X)))

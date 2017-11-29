@@ -1,5 +1,6 @@
 import os
 from hearthstone.cardxml import load_dbf
+from hearthstone.enums import CardClass
 
 _CARD_DATA_CACHE = {}
 
@@ -11,10 +12,14 @@ def card_db():
 	return _CARD_DATA_CACHE["db"]
 
 
-def dbf_id_vector():
+def dbf_id_vector(player_class=None):
 	db = card_db()
+	if player_class:
+		classes = (CardClass[player_class], CardClass.NEUTRAL)
+		all_collectibles = [c for c in db.values() if c.collectible and c.card_class in classes]
+	else:
+		all_collectibles = [c for c in db.values() if c.collectible]
 
-	all_collectibles = [c for c in db.values() if c.collectible]
 	return [c.dbf_id for c in sorted(all_collectibles, key=lambda c: c.dbf_id)]
 
 
