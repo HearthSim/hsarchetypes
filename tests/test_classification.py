@@ -1,6 +1,8 @@
 import json
 import os
+
 from hsarchetypes.classification import classify_deck
+
 from .conftest import LABELED_CLUSTERS
 
 

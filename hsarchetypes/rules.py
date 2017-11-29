@@ -1,4 +1,5 @@
 from hearthstone.enums import GameTag
+
 from .utils import card_db
 
 

@@ -1,8 +1,10 @@
 import json
 import os
-from .conftest import CLUSTERING_DATA
+
 from hsarchetypes.clustering import create_cluster_set
 from hsarchetypes.features import to_neural_net_training_data
+
+from .conftest import CLUSTERING_DATA
 
 
 def test_clustering_aug12_to_aug19_standard():

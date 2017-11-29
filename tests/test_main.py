@@ -1,11 +1,13 @@
 import json
 import os
+
 import pytest
 from hearthstone.enums import CardClass
+from hsarchetypes.classification import classify_deck
 from hsarchetypes.signatures import (
 	_calc_cross_cluster_modifier, calculate_signature_weights
 )
-from hsarchetypes.classification import classify_deck
+
 from .conftest import FIXTURE_SUITE
 
 

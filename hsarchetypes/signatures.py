@@ -1,5 +1,5 @@
-from copy import copy
 from collections import Counter
+from copy import copy
 
 
 ARCHETYPE_CORE_CARD_THRESHOLD = .8

@@ -2,7 +2,9 @@ import json
 import logging
 from copy import deepcopy
 from itertools import combinations
+
 from hearthstone.enums import CardClass
+
 from .features import *
 from .rules import *
 from .signatures import calculate_signature_weights

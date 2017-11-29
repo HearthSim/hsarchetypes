@@ -1,6 +1,8 @@
 from collections import defaultdict
 from random import randint, shuffle
-from hearthstone.enums import GameTag, Race, CardType
+
+from hearthstone.enums import CardType, GameTag, Race
+
 from .utils import card_db, one_hot_encoding
 
 
