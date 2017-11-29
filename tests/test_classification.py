@@ -13,9 +13,9 @@ def test_kft_warlock_classification(kft_standard_warlock_signatures, kft_control
 
 
 def test_neural_network_training():
-
 	data_path = os.path.join(
 		LABELED_CLUSTERS,
 		"cluster_snapshot.json"
 	)
-	data = json.load(open(data_path, "r"))
+	with open(data_path, "r") as f:
+		json.load(f)

@@ -43,27 +43,27 @@ def to_prediction_vector_from_dbf_map(dbf_map):
 
 def plot_loss_graph(history, player_class, output_path):
 	import matplotlib
-	matplotlib.use('Agg')
+	matplotlib.use("Agg")
 	import matplotlib.pyplot as plt
-	plt.plot(history.history['loss'])
-	plt.plot(history.history['val_loss'])
-	plt.title('%s model loss' % player_class)
-	plt.ylabel('loss')
-	plt.xlabel('epoch')
-	plt.legend(['train', 'test'], loc='upper left')
+	plt.plot(history.history["loss"])
+	plt.plot(history.history["val_loss"])
+	plt.title("%s model loss" % player_class)
+	plt.ylabel("loss")
+	plt.xlabel("epoch")
+	plt.legend(["train", "test"], loc="upper left")
 	plt.savefig(output_path)
 	plt.clf()
 
 
 def plot_accuracy_graph(history, player_class, output_path):
 	import matplotlib
-	matplotlib.use('Agg')
+	matplotlib.use("Agg")
 	import matplotlib.pyplot as plt
-	plt.plot(history.history['acc'])
-	plt.plot(history.history['val_acc'])
-	plt.title('%s model accuracy' % player_class)
-	plt.ylabel('accuracy')
-	plt.xlabel('epoch')
-	plt.legend(['train', 'test'], loc='upper left')
+	plt.plot(history.history["acc"])
+	plt.plot(history.history["val_acc"])
+	plt.title("%s model accuracy" % player_class)
+	plt.ylabel("accuracy")
+	plt.xlabel("epoch")
+	plt.legend(["train", "test"], loc="upper left")
 	plt.savefig(output_path)
 	plt.clf()

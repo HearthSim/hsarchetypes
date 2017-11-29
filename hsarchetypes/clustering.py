@@ -1,6 +1,8 @@
+# flake8: noqa (fix features and rules imports)
 import json
 import logging
 from copy import deepcopy
+from collections import defaultdict
 from itertools import combinations
 
 from hearthstone.enums import CardClass
@@ -406,7 +408,8 @@ class ClassClusters:
 
 		most_similar = _most_similar_pair(current_clusters, distance_function)
 		if most_similar:
-			logger.info("Most similar clusters: %r: %r - %r score = %r",
+			logger.info(
+				"Most similar clusters: %r: %r - %r score = %r",
 				CardClass(self.player_class), most_similar[0].cluster_id,
 				most_similar[1].cluster_id, most_similar[2]
 			)

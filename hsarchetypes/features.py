@@ -83,12 +83,12 @@ def to_tribe_vector(deck):
 
 
 def to_neural_net_training_data(
-		class_cluster,
-		num_examples=1000000,  # Actually train on 10MM
-		max_dropped_cards=15,
-		stratified=False,
-		min_cards_for_determination=5  # Minimum cards needed to make a determination
-	):
+	class_cluster,
+	num_examples=1000000,  # Actually train on 10MM
+	max_dropped_cards=15,
+	stratified=False,
+	min_cards_for_determination=5  # Minimum cards needed to make a determination
+):
 	import numpy as np
 	print("Generating %i examples of training data with %i max dropped cards" % (num_examples, max_dropped_cards))
 

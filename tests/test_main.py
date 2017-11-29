@@ -29,12 +29,12 @@ def test_calc_cross_cluster_modifier():
 
 @pytest.mark.skip(reason="Skipping while refactoring fixture format")
 @pytest.mark.parametrize(
-	'game_format',
+	"game_format",
 	["FT_STANDARD", "FT_WILD"]
 )
 @pytest.mark.parametrize(
-	'player_class_name',
-	['DRUID', 'HUNTER', 'MAGE', 'PALADIN', 'PRIEST', 'ROGUE', 'SHAMAN', 'WARLOCK', 'WARRIOR']
+	"player_class_name",
+	["DRUID", "HUNTER", "MAGE", "PALADIN", "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR"]
 )
 def test_signature_components(dbf_db, game_format, player_class_name):
 	for snapshot in os.listdir(FIXTURE_SUITE):
