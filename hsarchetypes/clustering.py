@@ -1,8 +1,8 @@
 # flake8: noqa (fix features and rules imports)
 import json
 import logging
-from copy import deepcopy
 from collections import defaultdict
+from copy import deepcopy
 from itertools import combinations
 
 from hearthstone.enums import CardClass
