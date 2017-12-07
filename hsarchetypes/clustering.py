@@ -1,7 +1,6 @@
 # flake8: noqa (fix features and rules imports)
 import json
 import logging
-from collections import defaultdict
 from copy import deepcopy
 from itertools import combinations
 
@@ -21,7 +20,7 @@ LOW_VOLUME_CLUSTER_MULTIPLIER = 1.5
 INHERITENCE_THRESHOLD = .85
 SMALL_CLUSTER_CUTOFF = 1500
 SIMILARITY_THRESHOLD_FLOOR = .85
-
+SIGNATURE_SIMILARITY_THRESHOLD = .25
 
 USE_THRESHOLDS = False
 
@@ -30,29 +29,61 @@ db = card_db()
 
 def cluster_similarity(c1, c2):
 	c1_signature = c1.signature
-	c1_card_list = c1_signature.keys()
 	c2_signature = c2.signature
-	c2_card_list = c2_signature.keys()
+	return signature_similarity(c1_signature, c2_signature)
+
+
+def signature_similarity(c1_signature, c2_signature, verbose=False):
+	c1_card_list = [k for k,v in c1_signature.items() if v >= SIGNATURE_SIMILARITY_THRESHOLD]
+	c2_card_list = [k for k,v in c2_signature.items() if v >= SIGNATURE_SIMILARITY_THRESHOLD]
 
 	intersection = list(set(c1_card_list) & set(c2_card_list))
 	union = list(set(c1_card_list) | set(c2_card_list))
 
 	values = {}
+	intersection_values = {}
 	for c in union:
 		if c in c1_signature and c in c2_signature:
-			values[c] = float((c1_signature[c] + c2_signature[c])) / 2.0
+			union_val = float((c1_signature[c] + c2_signature[c]) / 2.0)
+			values[c] = union_val
+			max_val = max(c1_signature[c], c2_signature[c])
+			abs_diff = abs(c1_signature[c] - c2_signature[c])
+			intersection_modifier = (max_val - abs_diff) / max_val
+			intersection_values[c] = intersection_modifier * union_val
 		elif c in c1_signature:
 			values[c] = c1_signature[c]
 		else:
 			values[c] = c2_signature[c]
 
 	w_intersection = 0.0
+	intersection_elements = []
 	for c in intersection:
-		w_intersection += values[c]
+		w_intersection += intersection_values[c]
+		intersection_elements.append((db[int(c)].name, round(intersection_values[c], 3)))
 
 	w_union = 0.0
+	union_elements = []
+	difference_elements = []
 	for c in union:
 		w_union += values[c]
+		if c in intersection:
+			union_elements.append((db[int(c)].name, round(values[c], 3)))
+		else:
+			difference_elements.append((db[int(c)].name, round(values[c], 3)))
+
+	if verbose:
+		sorted_intersection = sorted(intersection_elements, key=lambda t: t[1], reverse=True)
+		intersection_elements = ["%s:%s" % t for t in sorted_intersection]
+
+		sorted_union = sorted(union_elements, key=lambda t: t[1], reverse=True)
+		union_elements = ["%s:%s" % t for t in sorted_union]
+
+		sorted_difference = sorted(difference_elements, key=lambda t: t[1], reverse=True)
+		difference_elements = ["%s:%s" % t for t in sorted_difference]
+
+		logger.info("INTERSECTION:\n\t%s" % "\n\t".join(intersection_elements))
+		logger.info("UNION:\n\t%s" % "\n\t".join(union_elements))
+		logger.info("DIFFERENCE:\n\t%s" % "\n\t".join(difference_elements))
 
 	if w_union == 0.0:
 		weighted_score = 0.0
@@ -175,6 +206,19 @@ class Cluster:
 			data_point["external_id"] = self.external_id
 
 	def __str__(self):
+		c_id = self.get_id()
+
+		template = "Cluster %s - %i data points (%i games) - %s"
+		pretty_sig = []
+		if self.signature is not None:
+			id_sorted = sorted(self.signature.items(), key=lambda t: t[0])
+			weight_sorted = reversed(sorted(id_sorted, key=lambda t: round(t[1], 2)))
+			for dbf, w in weight_sorted:
+				card = db[int(dbf)]
+				pretty_sig.append("%s:%s" % (card.name, round(w, 2)))
+		return template % (str(c_id), len(self.data_points), self.observations, ", ".join(pretty_sig))
+
+	def get_id(self):
 		c_id = None
 		if self.cluster_id is not None:
 			c_id = self.cluster_id
@@ -182,14 +226,7 @@ class Cluster:
 			c_id = self.name
 		elif self.external_id:
 			c_id = self.external_id
-
-		template = "Cluster %s - %i data points (%i games) - %s"
-		pretty_sig = []
-		if self.signature is not None:
-			for dbf, w in sorted(self.signature.items(), key=lambda t: t[1], reverse=True):
-				card = db[int(dbf)]
-				pretty_sig.append("%s:%s" % (card.name, round(w, 2)))
-		return template % (str(c_id), len(self.data_points), self.observations, ", ".join(pretty_sig))
+		return c_id
 
 	def __repr__(self):
 		return str(self)
@@ -290,6 +327,10 @@ class ClassClusters:
 	def __repr__(self):
 		return str(self)
 
+	@property
+	def player_class_name(self):
+		return CardClass(self.player_class).name
+
 	def to_json(self):
 		result = {
 			"player_class": self.player_class.name,
@@ -346,7 +387,7 @@ class ClassClusters:
 		new_clusters = [
 			c for c in self.clusters if c.external_id != EXPERIMENTAL
 		]
-		logger.info("Attempting inheritance")
+		logger.info("Attempting inheritance for: %s" % self.player_class_name)
 
 		while old_clusters:
 			old, new, similarity = find_closest_cluster_pair(old_clusters, new_clusters)
@@ -362,6 +403,7 @@ class ClassClusters:
 		return set(old.external_id for old in old_clusters)
 
 	def update_cluster_signatures(self, use_pcp_adjustment=True):
+		logger.info("Updating Signatures For: %s" % self.player_class_name)
 		signature_weights = calculate_signature_weights(
 			[(c.cluster_id, c.data_points) for c in self.clusters],
 			use_ccp=False,
@@ -410,17 +452,24 @@ class ClassClusters:
 		if most_similar:
 			logger.info(
 				"Most similar clusters: %r: %r - %r score = %r",
-				CardClass(self.player_class), most_similar[0].cluster_id,
+				CardClass(self.player_class).name, most_similar[0].cluster_id,
 				most_similar[1].cluster_id, most_similar[2]
 			)
 			logger.info(most_similar[0])
 			logger.info(most_similar[1])
 
+			# verbose=True to log the cluster comparison
+			signature_similarity(
+				most_similar[0].signature,
+				most_similar[1].signature,
+				verbose=True
+			)
+
 		if not most_similar or most_similar[2] < minimum_simularity:
 			logger.info("Clusters do not meet minimum similarity")
 			return current_clusters
 
-		logger.info("Clusters will be merged.")
+		logger.info("Clusters will be merged into new cluster with ID: %i" % next_cluster_id)
 		c1, c2, sim_score = most_similar
 		new_cluster = merge_clusters(cluster_factory, cluster_set, next_cluster_id, [c1, c2])
 		next_clusters_list = [new_cluster]
@@ -487,7 +536,8 @@ class ClusterSet:
 
 	def consolidate_clusters(self, merge_similarity):
 		for class_cluster in self.class_clusters:
-			logger.info("****** Consolidating: %s ******", class_cluster.player_class)
+			class_cluster_name = CardClass(class_cluster.player_class).name
+			logger.info("****** Consolidating: %s ******", class_cluster_name)
 			class_cluster.consolidate_clusters(merge_similarity)
 
 	def create_experimental_clusters(self, experimental_cluster_threshold=SMALL_CLUSTER_CUTOFF):
@@ -564,7 +614,9 @@ def create_cluster_set(
 
 	class_clusters = []
 	for player_class, data_points in data.items():
+		logger.info("\nStarting Clustering For: %s" % player_class)
 		X = []
+
 		base_vector = dbf_id_vector(player_class=player_class)
 		for data_point in data_points:
 			cards = data_point["cards"]

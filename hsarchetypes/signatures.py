@@ -1,11 +1,16 @@
+import logging
 from collections import Counter
 from copy import copy
+from .utils import card_db
+
+from hearthstone.enums import CardSet
 
 
 ARCHETYPE_CORE_CARD_THRESHOLD = .8
 ARCHETYPE_CORE_CARD_WEIGHT = 1
 ARCHETYPE_TECH_CARD_THRESHOLD = .3
 ARCHETYPE_TECH_CARD_WEIGHT = .5
+PCP_EVERGREEN_THRESHOLD = .6
 PCP_THRESHOLD = .7
 
 
@@ -13,6 +18,10 @@ default_thresholds = {
 	ARCHETYPE_CORE_CARD_THRESHOLD: ARCHETYPE_CORE_CARD_WEIGHT,
 	ARCHETYPE_TECH_CARD_THRESHOLD: ARCHETYPE_TECH_CARD_WEIGHT,
 }
+
+
+logger = logging.getLogger("hsarchetypes")
+db = card_db()
 
 
 def calculate_player_class_prevalence(cluster_data):
@@ -25,9 +34,22 @@ def calculate_player_class_prevalence(cluster_data):
 				for dbf_id, count in deck["cards"].items():
 					card_counter[dbf_id] += obs_count
 
-		return {
-			str(dbf_id): card_counter[dbf_id] / deck_occurrences for dbf_id in card_counter
-		}
+		result = {}
+		logger.info("\nCalculating PCP Values")
+		for dbf_id in card_counter:
+			pcp_val = card_counter[dbf_id] / deck_occurrences
+			if db[int(dbf_id)].card_set in (CardSet.CORE, CardSet.EXPERT1):
+				# Evergreen card
+				if pcp_val >= PCP_EVERGREEN_THRESHOLD:
+					result[str(dbf_id)] = pcp_val
+			else:
+				if pcp_val >= PCP_THRESHOLD:
+					result[str(dbf_id)] = pcp_val
+
+		for dbf_id, pcp_val in sorted(result.items(), key=lambda t: t[1], reverse=True):
+			logger.info("\t%s: %s" % (db[int(dbf_id)].name, str(pcp_val)))
+
+		return result
 
 
 def calculate_signature_weights(
@@ -116,13 +138,13 @@ def calculate_prevalences(
 			for threshold in sorted(thresholds.keys(), reverse=True):
 				if prevalence >= threshold:
 					weight = float(thresholds[threshold]) * prevalence
-					if pcp_weights.get(dbf_id, 0) >= PCP_THRESHOLD:
+					if dbf_id in pcp_weights:
 						weight = weight * (1 - pcp_weights[dbf_id] ** 3)
 
 					ret[dbf_id] = weight
 					break
 		else:
-			if pcp_weights.get(dbf_id, 0) >= PCP_THRESHOLD:
+			if dbf_id in pcp_weights:
 				prevalence = prevalence * (1 - pcp_weights[dbf_id] ** 3)
 
 			ret[dbf_id] = prevalence
