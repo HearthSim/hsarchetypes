@@ -540,9 +540,13 @@ class ClusterSet:
 			logger.info("****** Consolidating: %s ******", class_cluster_name)
 			class_cluster.consolidate_clusters(merge_similarity)
 
-	def create_experimental_clusters(self, experimental_cluster_threshold=SMALL_CLUSTER_CUTOFF):
+	def create_experimental_clusters(self, experimental_cluster_thresholds):
 		for class_cluster in self.class_clusters:
-			class_cluster.create_experimental_cluster(experimental_cluster_threshold)
+			threshold = experimental_cluster_thresholds.get(
+				class_cluster.player_class_name,
+				SMALL_CLUSTER_CUTOFF
+			)
+			class_cluster.create_experimental_cluster(threshold)
 
 	def to_chart_data(self, with_external_ids=False, include_ccp_signature=False, as_of="", external_names={}):
 		result = []
