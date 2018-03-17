@@ -479,6 +479,58 @@ class ClassClusters:
 
 		return next_clusters_list
 
+	def merge_cluster_into_external_cluster(self, external_cluster, to_be_merged):
+		# Method used to merge clusters together during Archetype Maintenance
+		if not external_cluster.external_id:
+			raise RuntimeError(
+				"The surviving cluster must have an external ID assigned."
+			)
+
+		if to_be_merged.external_id:
+			raise RuntimeError(
+				"The cluster to be merged cannot have an external ID assigned."
+			)
+
+		cluster_set = self._cluster_set
+		cluster_factory = cluster_set.CLUSTER_FACTORY
+		next_cluster_id = max(c.cluster_id for c in self.clusters) + 1
+		current_clusters = list(self.clusters)
+
+		new_cluster_data_points = []
+		new_cluster_rules = []
+		external_id = external_cluster.external_id
+		name = external_cluster.name
+
+		for cluster in [external_cluster, to_be_merged]:
+			new_cluster_data_points.extend(cluster.data_points)
+			for rule_name in cluster.rules:
+				if rule_name not in new_cluster_rules:
+					new_cluster_rules.append(rule_name)
+
+		for rule_name in new_cluster_rules:
+			rule = FALSE_POSITIVE_RULES[rule_name]
+			if not all(rule(d) for d in new_cluster_data_points):
+				raise RuntimeError(
+					"Not all data points in clusters to be merged pass rule: %s" % (rule_name)
+				)
+
+		new_cluster = Cluster.create(
+			cluster_factory,
+			cluster_set,
+			cluster_id=next_cluster_id,
+			data_points=new_cluster_data_points,
+			external_id=external_id,
+			name=name,
+			rules=new_cluster_rules,
+		)
+
+		next_clusters_list = [new_cluster]
+		for c in current_clusters:
+			if c.cluster_id not in (external_cluster.cluster_id, to_be_merged.cluster_id):
+				next_clusters_list.append(c)
+
+		self.clusters = next_clusters_list
+
 
 class ClusterSet:
 	"""A collection of ClassClusters."""
