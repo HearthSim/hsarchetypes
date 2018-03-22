@@ -491,7 +491,7 @@ class ClassClusters:
 				"The cluster to be merged cannot have an external ID assigned."
 			)
 
-		cluster_set = self._cluster_set
+		cluster_set = self.cluster_set
 		cluster_factory = cluster_set.CLUSTER_FACTORY
 		next_cluster_id = max(c.cluster_id for c in self.clusters) + 1
 		current_clusters = list(self.clusters)
