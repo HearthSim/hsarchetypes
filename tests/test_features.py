@@ -1,12 +1,14 @@
 import json
-import os
 
+import os
+import pytest
 from hsarchetypes.clustering import create_cluster_set
 from hsarchetypes.features import to_neural_net_training_data
 
 from .conftest import CLUSTERING_DATA
 
 
+@pytest.mark.skip(reason="Skipping while refactoring fixture format")
 def test_clustering_aug12_to_aug19_standard():
 	data_path = os.path.join(
 		CLUSTERING_DATA,
