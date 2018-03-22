@@ -1,7 +1,8 @@
 import json
-
 import os
+
 import pytest
+
 from hsarchetypes.clustering import create_cluster_set
 from hsarchetypes.features import to_neural_net_training_data
 

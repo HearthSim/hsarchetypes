@@ -1,11 +1,13 @@
 import json
-
 import os
+
 import pytest
+
 from hsarchetypes.clustering import create_cluster_set
 from hsarchetypes.utils import card_db
 
 from .conftest import CLUSTERING_DATA
+
 
 db = card_db()
 
