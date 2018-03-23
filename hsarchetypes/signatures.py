@@ -11,6 +11,7 @@ ARCHETYPE_CORE_CARD_THRESHOLD = .8
 ARCHETYPE_CORE_CARD_WEIGHT = 1
 ARCHETYPE_TECH_CARD_THRESHOLD = .3
 ARCHETYPE_TECH_CARD_WEIGHT = .5
+CCP_THRESHOLD = .1
 PCP_EVERGREEN_THRESHOLD = .6
 PCP_THRESHOLD = .7
 
@@ -161,7 +162,7 @@ def apply_cross_cluster_prevalence(weights, all_other_weights):
 
 		count_in_other_archetypes = 0
 		for other_archetype, other_weights in all_other_weights.items():
-			if dbf_id in other_weights:
+			if other_weights.get(dbf_id, 0) > CCP_THRESHOLD:
 				count_in_other_archetypes += 1
 
 		cluster_freq_modifier = _calc_cross_cluster_modifier(
