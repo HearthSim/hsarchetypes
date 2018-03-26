@@ -11,6 +11,7 @@ ARCHETYPE_CORE_CARD_THRESHOLD = .8
 ARCHETYPE_CORE_CARD_WEIGHT = 1
 ARCHETYPE_TECH_CARD_THRESHOLD = .3
 ARCHETYPE_TECH_CARD_WEIGHT = .5
+CCP_INPUT_CUTOFF = .3
 CCP_THRESHOLD = .1
 PCP_EVERGREEN_THRESHOLD = .6
 PCP_THRESHOLD = .7
@@ -94,7 +95,7 @@ def calculate_signature_weights(
 		return raw_new_weights
 
 
-def generate_ccp_input_weights(input_weights, cutoff=.5):
+def generate_ccp_input_weights(input_weights, cutoff=CCP_INPUT_CUTOFF):
 	result = {}
 	for cluster_id, weights in input_weights.items():
 		if cluster_id not in result:
