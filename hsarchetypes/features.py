@@ -45,6 +45,8 @@ mechanics = [
 	GameTag.TAUNT,
 	GameTag.WINDFURY,
 	GameTag.JADE_GOLEM,
+	GameTag.RUSH,
+	GameTag.ECHO
 ]
 
 
