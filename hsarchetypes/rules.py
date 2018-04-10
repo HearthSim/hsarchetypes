@@ -18,7 +18,25 @@ def is_quest_deck(data_point):
 	return False
 
 
+def is_even_only_deck(data_point):
+	for dbf_id in data_point["cards"]:
+		card = db[int(dbf_id)]
+		if card.cost % 2 != 0:
+			return False
+	return True
+
+
+def is_odd_only_deck(data_point):
+	for dbf_id in data_point["cards"]:
+		card = db[int(dbf_id)]
+		if card.cost % 2 != 1:
+			return False
+	return True
+
+
 FALSE_POSITIVE_RULES = {
 	"is_highlander_deck": is_highlander_deck,
-	"is_quest_deck": is_quest_deck
+	"is_quest_deck": is_quest_deck,
+	"is_even_only_deck": is_even_only_deck,
+	"is_odd_only_deck": is_odd_only_deck
 }

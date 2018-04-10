@@ -1,4 +1,6 @@
-from hsarchetypes.rules import is_highlander_deck, is_quest_deck
+from hsarchetypes.rules import (
+	is_even_only_deck, is_highlander_deck, is_odd_only_deck, is_quest_deck
+)
 
 from .utils import get_data_point_from_deckstring
 
@@ -44,3 +46,19 @@ def test_is_quest_deck():
 
 	SECRET_MAGE = get_data_point_from_deckstring("AAECAf0EBsABqwS/CKO2Atm7AqLTAgxxuwKVA+YElgXsBde2Auu6Aoe9AsHBApjEAo/TAgA=")
 	assert not is_quest_deck(SECRET_MAGE)
+
+
+def test_is_even_only_deck():
+	EVEN_MAGE = get_data_point_from_deckstring("AAEBAf0EBIAEpRDyE/LTAg0piwOuA5YGvwiNELoR8RONrAL0rwLBwQLczQKIzgIA")
+	assert is_even_only_deck(EVEN_MAGE)
+
+	SECRET_MAGE = get_data_point_from_deckstring("AAECAf0EBsABqwS/CKO2Atm7AqLTAgxxuwKVA+YElgXsBde2Auu6Aoe9AsHBApjEAo/TAgA=")
+	assert not is_even_only_deck(SECRET_MAGE)
+
+
+def test_is_odd_only_deck():
+	ODD_MAGE = get_data_point_from_deckstring("AAEBAf0ECIUD7AeTD4QQo7YC+L8C1+ECo+sCC8ABwwHtBMoI7ROBsgLnvwKhwgK50QLu0wKW5AIA")
+	assert is_odd_only_deck(ODD_MAGE)
+
+	SECRET_MAGE = get_data_point_from_deckstring("AAECAf0EBsABqwS/CKO2Atm7AqLTAgxxuwKVA+YElgXsBde2Auu6Aoe9AsHBApjEAo/TAgA=")
+	assert not is_odd_only_deck(SECRET_MAGE)
