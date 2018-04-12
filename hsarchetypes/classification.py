@@ -1,11 +1,13 @@
 from .utils import to_prediction_vector_from_dbf_map
 
 
-def classify_deck(deck, signature_weights):
+def classify_deck(deck, clusters):
 	distances = []
-	archetype_normalizers, cutoff_threshold = calculate_archetype_normalizers(signature_weights)
+	archetype_normalizers, cutoff_threshold = calculate_archetype_normalizers(clusters)
 
-	for cluster_id, weights in signature_weights.items():
+	for cluster_id, weights in clusters.items():
+		if "signature_weights" in weights:
+			weights = weights["signature_weights"]
 		distance = 0
 
 		for dbf_id, weight in weights.items():
@@ -21,10 +23,12 @@ def classify_deck(deck, signature_weights):
 		return distances[0][0]
 
 
-def calculate_archetype_normalizers(signature_weights):
+def calculate_archetype_normalizers(clusters):
 	largest_signature_id = None
 	largest_signature_max_score = 0.0
-	for archetype_id, signature in signature_weights.items():
+	for archetype_id, signature in clusters.items():
+		if "signature_weights" in signature:
+			signature = signature["signature_weights"]
 		max_score = float(sum(signature.values()))
 		if max_score > largest_signature_max_score:
 			largest_signature_max_score = max_score
@@ -34,7 +38,9 @@ def calculate_archetype_normalizers(signature_weights):
 	result = {
 		largest_signature_id: 1.0
 	}
-	for archetype_id, signature in signature_weights.items():
+	for archetype_id, signature in clusters.items():
+		if "signature_weights" in signature:
+			signature = signature["signature_weights"]
 		if archetype_id != largest_signature_id:
 			result[archetype_id] = largest_signature_max_score / float(sum(signature.values()))
 	return result, cutoff_threshold
