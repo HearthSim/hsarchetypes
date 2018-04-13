@@ -1,3 +1,4 @@
+from .rules import FALSE_POSITIVE_RULES
 from .utils import to_prediction_vector_from_dbf_map
 
 
@@ -5,15 +6,21 @@ def classify_deck(deck, clusters):
 	distances = []
 	archetype_normalizers, cutoff_threshold = calculate_archetype_normalizers(clusters)
 
-	for cluster_id, weights in clusters.items():
-		if "signature_weights" in weights:
-			weights = weights["signature_weights"]
+	for cluster_id, cluster in clusters.items():
 		distance = 0
 
+		weights = cluster["signature_weights"]
 		for dbf_id, weight in weights.items():
 			if dbf_id in deck:
 				distance += weight * float(deck[dbf_id])
 		distance *= archetype_normalizers[cluster_id]
+
+		rules = cluster.get("rules", [])
+		for rule in rules:
+			if rule in FALSE_POSITIVE_RULES:
+				if not FALSE_POSITIVE_RULES[rule]({"cards": deck}):
+					distance *= 0
+					break
 
 		if distance and distance >= cutoff_threshold:
 			distances.append((cluster_id, distance))
@@ -26,9 +33,8 @@ def classify_deck(deck, clusters):
 def calculate_archetype_normalizers(clusters):
 	largest_signature_id = None
 	largest_signature_max_score = 0.0
-	for archetype_id, signature in clusters.items():
-		if "signature_weights" in signature:
-			signature = signature["signature_weights"]
+	for archetype_id, cluster in clusters.items():
+		signature = cluster["signature_weights"]
 		max_score = float(sum(signature.values()))
 		if max_score > largest_signature_max_score:
 			largest_signature_max_score = max_score
@@ -38,9 +44,8 @@ def calculate_archetype_normalizers(clusters):
 	result = {
 		largest_signature_id: 1.0
 	}
-	for archetype_id, signature in clusters.items():
-		if "signature_weights" in signature:
-			signature = signature["signature_weights"]
+	for archetype_id, cluster in clusters.items():
+		signature = cluster["signature_weights"]
 		if archetype_id != largest_signature_id:
 			result[archetype_id] = largest_signature_max_score / float(sum(signature.values()))
 	return result, cutoff_threshold
