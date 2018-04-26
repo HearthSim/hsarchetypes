@@ -674,6 +674,7 @@ def create_cluster_set(
 		X = []
 
 		base_vector = dbf_id_vector(player_class=player_class)
+		logger.info("Base Cluster Length: %s" % len(base_vector))
 		for data_point in data_points:
 			cards = data_point["cards"]
 			vector = [float(cards.get(str(dbf_id), 0)) / 2.0 for dbf_id in base_vector]
@@ -702,6 +703,8 @@ def create_cluster_set(
 				vector.extend(mechanic_vector)
 
 			X.append(vector)
+
+		logger.info("Full Feature Vector Length: %s" % len(X[0]))
 
 		if len(data_points) > 1:
 			tsne = manifold.TSNE(n_components=2, init='pca', random_state=0)
