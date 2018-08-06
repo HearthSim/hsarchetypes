@@ -46,7 +46,8 @@ mechanics = [
 	GameTag.WINDFURY,
 	GameTag.JADE_GOLEM,
 	GameTag.RUSH,
-	GameTag.ECHO
+	GameTag.ECHO,
+	GameTag.MODULAR
 ]
 
 
