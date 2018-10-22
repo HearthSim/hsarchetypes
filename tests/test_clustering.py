@@ -3,10 +3,11 @@ import os
 
 import pytest
 
-from hsarchetypes.clustering import create_cluster_set
+from hsarchetypes.clustering import Cluster, ClusterSet, create_cluster_set, merge_clusters
 from hsarchetypes.utils import card_db
 
 from .conftest import CLUSTERING_DATA
+from .utils import get_deck_from_deckstring
 
 
 db = card_db()
@@ -173,3 +174,115 @@ def test_clustering_aug12_to_aug19_standard():
 
 	chart_data = cluster_set.to_chart_data()
 	assert chart_data is not None
+
+
+TAUNT_DRUID = get_deck_from_deckstring(
+	"AAECAZICCMQGws4Cr9MC5tMCjeYC8eoC3esCv/ICC0Bf6QHkCMnHApTSApjSAp7SAovhAoTmAo3wAgA="
+)
+
+MECHATHUN_DRUID_1 = get_deck_from_deckstring(
+	"AAECAZICBFaHzgKZ0wLx+wINQF/pAf4BxAbkCKDNApTSApjSAp7SAtvTAoTmAr/yAgA="
+)
+
+MECHATHUN_DRUID_2 = get_deck_from_deckstring(
+	"AAECAZICApnTAvH7Ag5AX+kB/gHTA8QGpAf2B+QIktICmNICntICv/ICj/YCAA=="
+)
+
+
+def _create_datapoint(deck):
+	return {
+		"x": 0,
+		"y": 0,
+		"cards": {str(k): v for k, v in deck.items()},
+		"observations": 1
+	}
+
+
+def test_merge_clusters():
+	cluster_set = ClusterSet()
+
+	cluster1 = Cluster.create(Cluster, cluster_set, -1, None)
+	cluster2 = Cluster.create(Cluster, cluster_set, 5, None, required_cards=[38857])
+
+	cluster3 = merge_clusters(Cluster, cluster_set, 5, [cluster1, cluster2])
+
+	assert cluster3.external_id == cluster2.external_id
+	assert cluster3.required_cards == cluster2.required_cards
+
+
+def test_merge_clusters_combine_required_cards():
+	cluster_set = ClusterSet()
+
+	cluster1 = Cluster.create(Cluster, cluster_set, -1, None, required_cards=[38856])
+	cluster2 = Cluster.create(Cluster, cluster_set, 5, None, required_cards=[38857])
+
+	cluster3 = merge_clusters(Cluster, cluster_set, 5, [cluster1, cluster2])
+
+	assert cluster3.external_id == cluster2.external_id
+	assert cluster3.required_cards == [38856, 38857]
+
+
+def test_merge_clusters_failure():
+	cs = ClusterSet()
+
+	cluster1 = Cluster.create(Cluster, cs, 1, [_create_datapoint(TAUNT_DRUID)])
+	cluster2 = Cluster.create(
+		Cluster,
+		cs,
+		2,
+		[_create_datapoint(MECHATHUN_DRUID_1)],
+		required_cards=[48625]
+	)
+
+	with pytest.raises(RuntimeError):
+		merge_clusters(Cluster, cs, 5, [cluster1, cluster2])
+
+
+class TestCluster:
+	def test_can_merge_true(self):
+		cs = ClusterSet()
+
+		cluster1 = Cluster.create(Cluster, cs, 1, [_create_datapoint(MECHATHUN_DRUID_1)])
+		cluster2 = Cluster.create(
+			Cluster,
+			cs,
+			2,
+			[_create_datapoint(MECHATHUN_DRUID_2)],
+			required_cards=[48625, 43294]
+		)
+
+		assert cluster1.can_merge(cluster2)
+
+	def test_can_merge_false(self):
+		cs = ClusterSet()
+
+		cluster1 = Cluster.create(Cluster, cs, 1, [_create_datapoint(TAUNT_DRUID)])
+		cluster2 = Cluster.create(
+			Cluster,
+			cs,
+			2,
+			[_create_datapoint(MECHATHUN_DRUID_1)],
+			required_cards=[48625]
+		)
+
+		assert not cluster1.can_merge(cluster2)
+
+	def test_inherit_from_previous(self):
+		cs = ClusterSet()
+
+		cluster1 = Cluster.create(Cluster, cs, 1, [_create_datapoint(TAUNT_DRUID)])
+		cluster2 = Cluster.create(
+			Cluster,
+			cs,
+			2,
+			[_create_datapoint(MECHATHUN_DRUID_1)],
+			external_id=247,
+			name="Mecha'thun Druid",
+			required_cards=[48625]
+		)
+
+		cluster1.inherit_from_previous(cluster2)
+
+		assert cluster1.external_id == 247
+		assert cluster1.name == "Mecha'thun Druid"
+		assert cluster1.required_cards == [48625]

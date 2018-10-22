@@ -132,11 +132,16 @@ def _most_similar_pair(clusters, distance_function):
 
 def merge_clusters(cluster_factory, cluster_set, new_cluster_id, clusters):
 	new_cluster_data_points = []
+	new_cluster_required_cards = []
 	new_cluster_rules = []
 	external_id = None
 	name = "NEW"
 	for cluster in clusters:
 		new_cluster_data_points.extend(cluster.data_points)
+		for required_card in cluster.required_cards:
+			if required_card not in new_cluster_required_cards:
+				new_cluster_required_cards.append(required_card)
+
 		for rule_name in cluster.rules:
 			if rule_name not in new_cluster_rules:
 				new_cluster_rules.append(rule_name)
@@ -150,6 +155,13 @@ def merge_clusters(cluster_factory, cluster_set, new_cluster_id, clusters):
 					"Cannot merge clusters with different external IDs: %r, %r" % (
 						external_id, cluster.external_id
 					)
+				)
+
+	for c in new_cluster_required_cards:
+		for d in new_cluster_data_points:
+			if str(c) not in d["cards"]:
+				raise RuntimeError(
+					"Not all data points in clusters to be merged include card: %s" % (c)
 				)
 
 	for rule_name in new_cluster_rules:
@@ -166,6 +178,7 @@ def merge_clusters(cluster_factory, cluster_set, new_cluster_id, clusters):
 		data_points=new_cluster_data_points,
 		external_id=external_id,
 		name=name,
+		required_cards=new_cluster_required_cards,
 		rules=new_cluster_rules,
 	)
 
@@ -183,7 +196,7 @@ class Cluster:
 	def create(
 		factory, cluster_set, cluster_id, data_points,
 		signature=None, ccp_signature=None,
-		name="NEW", external_id=None, rules=None
+		name="NEW", external_id=None, required_cards=None, rules=None
 	):
 		self = factory()
 		self._factory = factory
@@ -195,6 +208,7 @@ class Cluster:
 		self.ccp_signature = ccp_signature
 		self.name = "Experimental" if cluster_id == -1 else name
 		self.external_id = external_id
+		self.required_cards = required_cards or []
 		self.rules = rules or []
 		self._augment_data_points()
 		return self
@@ -237,6 +251,7 @@ class Cluster:
 			"experimental": self.experimental,
 			"signature": self.signature,
 			"name": self.name,
+			"required_cards": self.required_cards,
 			"rules": self.rules,
 			"data_points": self.data_points,
 			"external_id": self.external_id,
@@ -269,6 +284,15 @@ class Cluster:
 					return False
 		return True
 
+	def satisfies_required_cards(self, required_cards):
+		"""Return True iff every deck in the cluster includes the specified cards."""
+
+		for required_card in required_cards:
+			for d in self.data_points:
+				if str(required_card) not in d["cards"]:
+					return False
+		return True
+
 	def must_merge(self, other_cluster):
 		self_has_id = self.external_id is not None
 		other_has_id = other_cluster.external_id is not None
@@ -277,14 +301,21 @@ class Cluster:
 		return self_has_id and other_has_id and can_merge
 
 	def can_merge(self, other_cluster):
-		other_satisfies_self = self.satisfies_rules(other_cluster.rules)
-		self_satisfies_other = other_cluster.satisfies_rules(self.rules)
+		other_satisfies_self = \
+			self.satisfies_rules(other_cluster.rules) and \
+			self.satisfies_required_cards(other_cluster.required_cards)
+		self_satisfies_other = \
+			other_cluster.satisfies_rules(self.rules) and \
+			other_cluster.satisfies_required_cards(self.required_cards)
+
 		no_external_id_conflict = self.external_id == other_cluster.external_id
+
 		return self_satisfies_other and other_satisfies_self and no_external_id_conflict
 
 	def inherit_from_previous(self, previous_cluster):
 		self.name = previous_cluster.name
 		self.external_id = previous_cluster.external_id
+		self.required_cards = previous_cluster.required_cards
 		self._augment_data_points()
 
 	def pretty_signature_string(self, sep=", "):
@@ -499,6 +530,7 @@ class ClassClusters:
 		new_cluster_data_points = []
 		new_cluster_rules = []
 		external_id = external_cluster.external_id
+		required_cards = external_cluster.required_cards
 		name = external_cluster.name
 
 		for cluster in [external_cluster, to_be_merged]:
@@ -521,6 +553,7 @@ class ClassClusters:
 			data_points=new_cluster_data_points,
 			external_id=external_id,
 			name=name,
+			required_cards=required_cards,
 			rules=new_cluster_rules,
 		)
 

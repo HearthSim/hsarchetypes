@@ -15,6 +15,15 @@ def classify_deck(deck, clusters):
 				distance += weight * float(deck[dbf_id])
 		distance *= archetype_normalizers[cluster_id]
 
+		# If this cluster has a required card list and any required cards aren't in the
+		# deck, nuke this deck's distance score down to zero.
+
+		required_cards = cluster.get("required_cards", [])
+		for required_card in required_cards:
+			if required_card not in deck:
+				distance *= 0
+				break
+
 		rules = cluster.get("rules", [])
 		for rule in rules:
 			if rule in FALSE_POSITIVE_RULES:
