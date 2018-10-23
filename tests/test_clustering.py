@@ -2,11 +2,8 @@ import json
 import os
 
 import pytest
-from hearthstone.enums import CardClass
 
-from hsarchetypes.clustering import (
-	ClassClusters, Cluster, ClusterSet, create_cluster_set, merge_clusters
-)
+from hsarchetypes.clustering import Cluster, ClusterSet, create_cluster_set, merge_clusters
 from hsarchetypes.utils import card_db
 
 from .conftest import CLUSTERING_DATA
@@ -289,50 +286,3 @@ class TestCluster:
 		assert cluster1.external_id == 247
 		assert cluster1.name == "Mecha'thun Druid"
 		assert cluster1.required_cards == [48625]
-
-
-class TestClusterSet:
-
-	def test_to_chart_series(self):
-		cluster_set = ClusterSet()
-
-		cluster = Cluster.create(
-			Cluster,
-			cluster_set,
-			2,
-			[_create_datapoint(MECHATHUN_DRUID_1)],
-			external_id=247,
-			name="Mecha'thun Druid",
-			required_cards=[48625],
-			signature={}
-		)
-
-		class_cluster = ClassClusters.create(
-			ClassClusters,
-			cluster_set,
-			CardClass.DRUID,
-			[cluster]
-		)
-
-		setattr(cluster_set, "class_clusters", [class_cluster])
-
-		assert cluster_set.to_chart_data() == [{
-			"as_of": "",
-			"ccp_signatures": {},
-			"cluster_map": {2: 247},
-			"cluster_names": {},
-			"cluster_required_cards": {2: [48625]},
-			"data": [{
-				"metadata": {
-					"cluster_id": 2,
-					"cluster_name": "Mecha'thun Druid",
-					"deck_list": None,
-					"games": 1,
-					"shortid": None
-				},
-				"x": 0,
-				"y": 0
-			}],
-			"player_class": "DRUID",
-			"signatures": {2: []}
-		}]
