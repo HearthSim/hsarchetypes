@@ -2,7 +2,23 @@ from .rules import FALSE_POSITIVE_RULES
 from .utils import to_prediction_vector_from_dbf_map
 
 
-def classify_deck(deck, clusters):
+def classify_deck(deck, clusters, failure_callback=None):
+	"""Attempt to classify the specified deck to one of the target archetype clusters.
+
+	Each cluster in the array of cluster data should be a dict with the following keys:
+	- signature_weights - a map of dbf_id (int) to prevalence (float)
+	- required_cards (optional) - an array of dbf_ids that must appear in the deck
+	- rules (optional) - an array of names of false positive rules to apply to the deck
+
+	The (optional) failure callback is invoked when a deck was blocked from a possible
+	classification by the application of a required card check or false positive rule.
+
+	:param deck: the deck, as a map of dbf_id (int) to included count
+	:param clusters: an array of cluster objects as above
+	:param failure_callback: the failure callback, or None
+	:return: the nearest above-threshold classification for the deck, or None
+	"""
+
 	distances = []
 	archetype_normalizers, cutoff_threshold = calculate_archetype_normalizers(clusters)
 
@@ -21,6 +37,17 @@ def classify_deck(deck, clusters):
 		required_cards = cluster.get("required_cards", [])
 		for required_card in required_cards:
 			if required_card not in deck:
+
+				# If this could have been a successful classification if the required card
+				# had been present, invoke the failure callback to notify the caller.
+
+				if failure_callback and distance >= cutoff_threshold:
+					failure_callback({
+						"archetype_id": cluster_id,
+						"reason": "missing_required_card",
+						"dbf_id": required_card
+					})
+
 				distance *= 0
 				break
 
@@ -28,6 +55,18 @@ def classify_deck(deck, clusters):
 		for rule in rules:
 			if rule in FALSE_POSITIVE_RULES:
 				if not FALSE_POSITIVE_RULES[rule]({"cards": deck}):
+
+					# If this could have been a successful classification without the false
+					# positive rule failure, invoke the failure callback to notify the
+					# caller.
+
+					if failure_callback and distance >= cutoff_threshold:
+						failure_callback({
+							"archetype_id": cluster_id,
+							"reason": "false_positive",
+							"rule": rule
+						})
+
 					distance *= 0
 					break
 

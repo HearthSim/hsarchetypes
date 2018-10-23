@@ -89,11 +89,32 @@ def test_required_cards():
 		},
 	}
 
-	assert MECHATHUN_PRIEST_ID == classify_deck(mechathun_priest_deck, signature_weights)
+	failure_callback_data = {}
+
+	def failure_callback(data):
+		failure_callback_data.update(data)
+
+	assert MECHATHUN_PRIEST_ID == classify_deck(
+		mechathun_priest_deck,
+		signature_weights,
+		failure_callback=failure_callback
+	)
+
+	assert failure_callback_data == {
+		"archetype_id": MECHATHUN_QUEST_PRIEST_ID,
+		"reason": "missing_required_card",
+		"dbf_id": 41494
+	}
+
+	failure_callback_data = {}
+
 	assert MECHATHUN_QUEST_PRIEST_ID == classify_deck(
 		mechathun_quest_priest_deck,
-		signature_weights
+		signature_weights,
+		failure_callback=failure_callback
 	)
+
+	assert failure_callback_data == {}
 
 
 def test_neural_network_training():
