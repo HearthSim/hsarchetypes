@@ -643,6 +643,7 @@ class ClusterSet:
 				"ccp_signatures": {},
 				"cluster_map": {},
 				"cluster_names": {},
+				"cluster_required_cards": {},
 				"as_of": as_of
 			}
 			for c in clusters:
@@ -657,6 +658,7 @@ class ClusterSet:
 					ccp_sig = [[int(dbf), weight] for dbf, weight in c.ccp_signature.items()]
 					player_class_result["ccp_signatures"][c.cluster_id] = ccp_sig
 				player_class_result["cluster_map"][c.cluster_id] = c.external_id
+				player_class_result["cluster_required_cards"][c.cluster_id] = c.required_cards
 				for data_point in c.data_points:
 					external_name = external_names.get(c.external_id, "")
 					arch_name = data_point["archetype_name"]
