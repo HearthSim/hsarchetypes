@@ -528,9 +528,9 @@ class ClassClusters:
 		current_clusters = list(self.clusters)
 
 		new_cluster_data_points = []
+		new_cluster_required_cards = []
 		new_cluster_rules = []
 		external_id = external_cluster.external_id
-		required_cards = external_cluster.required_cards
 		name = external_cluster.name
 
 		for cluster in [external_cluster, to_be_merged]:
@@ -538,6 +538,20 @@ class ClassClusters:
 			for rule_name in cluster.rules:
 				if rule_name not in new_cluster_rules:
 					new_cluster_rules.append(rule_name)
+			for required_card in cluster.required_cards:
+				if required_card not in new_cluster_required_cards:
+					new_cluster_required_cards.append(required_card)
+
+		# Ensure that all data points in the two clusters satisfy each others' required
+		# cards and false positive rules before merging them.
+
+		for required_card in [str(c) for c in new_cluster_required_cards]:
+			if not all(required_card in d["cards"] for d in new_cluster_data_points):
+				raise RuntimeError(
+					"Not all data points in clusters to be merged include req. card: %s" % (
+						required_card
+					)
+				)
 
 		for rule_name in new_cluster_rules:
 			rule = FALSE_POSITIVE_RULES[rule_name]
@@ -553,7 +567,7 @@ class ClassClusters:
 			data_points=new_cluster_data_points,
 			external_id=external_id,
 			name=name,
-			required_cards=required_cards,
+			required_cards=new_cluster_required_cards,
 			rules=new_cluster_rules,
 		)
 

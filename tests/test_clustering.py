@@ -241,6 +241,56 @@ def test_merge_clusters_failure():
 		merge_clusters(Cluster, cs, 5, [cluster1, cluster2])
 
 
+class TestClassClusters:
+	def test_merge_cluster_into_external_cluster(self):
+		cs = ClusterSet()
+
+		clusters = [
+			Cluster.create(Cluster, cs, 1, [_create_datapoint(MECHATHUN_DRUID_1)]),
+			Cluster.create(
+				Cluster,
+				cs,
+				2,
+				[_create_datapoint(MECHATHUN_DRUID_2)],
+				external_id=247,
+				required_cards=[48625, 43294]
+			)
+		]
+
+		class_clusters = ClassClusters.create(ClassClusters, cs, CardClass.DRUID, clusters)
+		setattr(class_clusters, "cluster_set", cs)
+
+		class_clusters.merge_cluster_into_external_cluster(clusters[1], clusters[0])
+
+		assert len(class_clusters.clusters) == 1
+
+		new_cluster = class_clusters.clusters[0]
+
+		assert new_cluster.external_id == 247
+		assert new_cluster.required_cards == [48625, 43294]
+
+	def test_merge_cluster_into_external_cluster_required_card_failure(self):
+		cs = ClusterSet()
+
+		clusters = [
+			Cluster.create(Cluster, cs, 1, [_create_datapoint(MECHATHUN_DRUID_1)]),
+			Cluster.create(
+				Cluster,
+				cs,
+				2,
+				[_create_datapoint(MECHATHUN_DRUID_2)],
+				external_id=247,
+				required_cards=[48625, 43294, 86]
+			)
+		]
+
+		class_clusters = ClassClusters.create(ClassClusters, cs, CardClass.DRUID, clusters)
+		setattr(class_clusters, "cluster_set", cs)
+
+		with pytest.raises(RuntimeError):
+			class_clusters.merge_cluster_into_external_cluster(clusters[1], clusters[0])
+
+
 class TestCluster:
 	def test_can_merge_true(self):
 		cs = ClusterSet()
