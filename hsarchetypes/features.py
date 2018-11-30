@@ -47,7 +47,8 @@ mechanics = [
 	GameTag.JADE_GOLEM,
 	GameTag.RUSH,
 	GameTag.ECHO,
-	GameTag.MODULAR
+	GameTag.MODULAR,
+	GameTag.OVERKILL
 ]
 
 
