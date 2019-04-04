@@ -48,7 +48,8 @@ mechanics = [
 	GameTag.RUSH,
 	GameTag.ECHO,
 	GameTag.MODULAR,
-	GameTag.OVERKILL
+	GameTag.OVERKILL,
+	GameTag.TWINSPELL
 ]
 
 
