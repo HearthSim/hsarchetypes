@@ -49,7 +49,8 @@ mechanics = [
 	GameTag.ECHO,
 	GameTag.MODULAR,
 	GameTag.OVERKILL,
-	GameTag.TWINSPELL
+	GameTag.TWINSPELL,
+	GameTag.REBORN,
 ]
 
 
