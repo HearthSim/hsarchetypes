@@ -36,6 +36,7 @@ mechanics = [
 	GameTag.JADE_LOTUS,
 	GameTag.KABAL,
 	GameTag.LIFESTEAL,
+	GameTag.OUTCAST,
 	GameTag.OVERLOAD,
 	GameTag.POISONOUS,
 	GameTag.RITUAL,
