@@ -3,6 +3,7 @@ import json
 import logging
 from copy import deepcopy
 from itertools import combinations
+from typing import Optional
 
 from hearthstone.enums import CardClass
 
@@ -698,22 +699,22 @@ class ClusterSet:
 
 def create_cluster_set(
 	input_data,
-	factory=ClusterSet,
+	cls=ClusterSet,
 	num_clusters=NUM_CLUSTERS,
 	merge_similarity=SIMILARITY_THRESHOLD_FLOOR,
 	consolidate=True,
-	create_experimental_cluster=True,
 	use_mana_curve=True,
 	use_tribes=True,
 	use_card_types=True,
 	use_mechanics=True,
+	experimental_threshold_pct: Optional[float] = 0.01,
 ):
 	from sklearn import manifold
 	from sklearn.cluster import KMeans
 	from sklearn.preprocessing import StandardScaler
 
-	self = factory()
-	self._factory = factory
+	cluster_set = cls()
+	cluster_set._factory = cls
 
 	data = deepcopy(input_data)
 
@@ -780,7 +781,7 @@ def create_cluster_set(
 		clusters = []
 		for id, data_points in data_points_in_cluster.items():
 			clusters.append(
-				Cluster.create(factory.CLUSTER_FACTORY, self, id, data_points)
+				Cluster.create(cls.CLUSTER_FACTORY, cluster_set, id, data_points)
 			)
 
 		next_cluster_id = max(data_points_in_cluster.keys()) + 1
@@ -792,8 +793,8 @@ def create_cluster_set(
 				if any(rule(d) for d in cluster.data_points):
 					data_point_matches = [d for d in cluster.data_points if rule(d)]
 					matches = Cluster.create(
-						factory.CLUSTER_FACTORY,
-						self,
+						cls.CLUSTER_FACTORY,
+						cluster_set,
 						next_cluster_id,
 						data_point_matches
 					)
@@ -806,8 +807,8 @@ def create_cluster_set(
 					data_point_misses = [d for d in cluster.data_points if not rule(d)]
 					if len(data_point_misses):
 						misses = Cluster.create(
-							factory.CLUSTER_FACTORY,
-							self,
+							cls.CLUSTER_FACTORY,
+							cluster_set,
 							next_cluster_id,
 							data_point_misses
 						)
@@ -820,20 +821,26 @@ def create_cluster_set(
 			next_clusters = []
 
 		class_cluster = ClassClusters.create(
-			factory.CLASS_CLUSTER_FACTORY,
-			self,
+			cls.CLASS_CLUSTER_FACTORY,
+			cluster_set,
 			int(CardClass[player_class]),
 			clusters
 		)
 		class_cluster.update_cluster_signatures()
 		class_clusters.append(class_cluster)
 
-	self.class_clusters = class_clusters
+	cluster_set.class_clusters = class_clusters
 
 	if consolidate:
-		self.consolidate_clusters(merge_similarity)
+		cluster_set.consolidate_clusters(merge_similarity)
 
-	if create_experimental_cluster:
-		self.create_experimental_clusters()
+	if experimental_threshold_pct is not None:
+		experimental_thresholds = {}
+		for player_class_name, data_points in data.items():
+			observations_for_class = sum(d["observations"] for d in data_points)
+			threshold_for_class = int(observations_for_class * experimental_threshold_pct)
+			experimental_thresholds[player_class_name] = threshold_for_class
 
-	return self
+		cluster_set.create_experimental_clusters(experimental_thresholds)
+
+	return cluster_set
