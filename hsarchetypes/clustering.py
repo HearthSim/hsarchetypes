@@ -707,6 +707,7 @@ def create_cluster_set(
 	use_tribes=True,
 	use_card_types=True,
 	use_mechanics=True,
+	use_sample_weights: bool = False,
 	experimental_threshold_pct: Optional[float] = 0.01,
 ):
 	from sklearn import manifold
@@ -722,6 +723,7 @@ def create_cluster_set(
 	for player_class, data_points in data.items():
 		logger.info("\nStarting Clustering For: %s" % player_class)
 		X = []
+		sample_weights = []
 
 		base_vector = dbf_id_vector(player_class=player_class)
 		logger.info("Base Cluster Length: %s" % len(base_vector))
@@ -753,6 +755,7 @@ def create_cluster_set(
 				vector.extend(mechanic_vector)
 
 			X.append(vector)
+			sample_weights.append(int(data_point["observations"]))
 
 		logger.info("Full Feature Vector Length: %s" % len(X[0]))
 
@@ -772,7 +775,11 @@ def create_cluster_set(
 
 		X = StandardScaler().fit_transform(X)
 		clusterizer = KMeans(n_clusters=min(int(num_clusters), len(X)))
-		clusterizer.fit(X)
+
+		if use_sample_weights:
+			clusterizer.fit(X, sample_weight=sample_weights)
+		else:
+			clusterizer.fit(X)
 
 		data_points_in_cluster = defaultdict(list)
 		for data_point, cluster_id in zip(data_points, clusterizer.labels_):
