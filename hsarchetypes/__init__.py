@@ -1,6 +1,7 @@
 import logging
-from .signatures import calculate_signature_weights
+
 from .classification import classify_deck
+from .signatures import calculate_signature_weights
 
 
 __all__ = ["calculate_signature_weights", "classify_deck"]
