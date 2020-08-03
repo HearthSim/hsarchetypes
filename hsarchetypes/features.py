@@ -52,6 +52,7 @@ mechanics = [
 	GameTag.OVERKILL,
 	GameTag.TWINSPELL,
 	GameTag.REBORN,
+	GameTag.SPELLBURST,
 ]
 
 
