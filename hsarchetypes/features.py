@@ -31,21 +31,16 @@ mechanics = [
 	GameTag.ENRAGED,
 	GameTag.FORGETFUL,
 	GameTag.FREEZE,
-	GameTag.GRIMY_GOONS,
 	GameTag.INSPIRE,
-	GameTag.JADE_LOTUS,
-	GameTag.KABAL,
 	GameTag.LIFESTEAL,
 	GameTag.OUTCAST,
 	GameTag.OVERLOAD,
 	GameTag.POISONOUS,
-	GameTag.RITUAL,
 	GameTag.SECRET,
 	GameTag.SPELLPOWER,
 	GameTag.SILENCE,
 	GameTag.TAUNT,
 	GameTag.WINDFURY,
-	GameTag.JADE_GOLEM,
 	GameTag.RUSH,
 	GameTag.ECHO,
 	GameTag.MODULAR,
@@ -53,6 +48,15 @@ mechanics = [
 	GameTag.TWINSPELL,
 	GameTag.REBORN,
 	GameTag.SPELLBURST,
+]
+
+
+wild_mechanics = mechanics + [
+	GameTag.GRIMY_GOONS,
+	GameTag.JADE_LOTUS,
+	GameTag.KABAL,
+	GameTag.RITUAL,
+	GameTag.JADE_GOLEM,
 ]
 
 
