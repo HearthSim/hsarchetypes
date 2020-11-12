@@ -25,6 +25,7 @@ mechanics = [
 	GameTag.CHARGE,
 	GameTag.CHOOSE_ONE,
 	GameTag.COMBO,
+	GameTag.CORRUPT,
 	GameTag.DEATHRATTLE,
 	GameTag.DISCOVER,
 	GameTag.DIVINE_SHIELD,
